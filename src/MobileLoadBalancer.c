@@ -1,34 +1,66 @@
+#include <stdio.h>
+#include <err.h>
+#include <sys/select.h>
 #include "Common.h"
-void configSignals() {
+#define APPPORT 6001
+#define MONPORT 8000
+config_t recvNewConf(socket_t socket)
+{
 
 }
 
-socket connectToMon() {
+socket_t connectToMon(int port)
+{
 
 }
 
-socket connectToApp() {
+socket_t connectToApp(int port)
+{
 
 }
 
-int main(int argc, char* argv[]) {
-	socket monitorSock, appSock;
-	fd_set fdsetw, fdsetr;
+int main(int argc, char *argv[])
+{
+	int retsel;
+	config_t currentConf, oldConf;
+	socket_t monitorSock, appSock;
+	fd_set infds, allsetinfds;
 
-	configSignals();
-	monitorSock = connectToMon();
-	appSock = connectToApp();
+	configSigHandlers();
+	monitorSock = connectToMon(MONPORT);
+	appSock = connectToApp(APPPORT);
 
-	for (;;) {
-		fd_set = checksocks(monitorSock,appSock);
-		if (FD_ISSET(monitor)) {
-			checkconf();
+	while (1) {
+		infds = allsetinfds;
+		retsel = select(fd + 1, &infds, NULL, NULL, NULL);
+		if (retsel > 0) {
+			if (FD_ISSET(monitor)) {
+				monitorData = recvPkts(monitor);
+
+				if (monitorData == NACK)
+					doSomething();
+				else if (monitorData == ACK)
+					doSomething();
+
+				else {
+					oldConf = currentConf;
+					currentConf = monitorData;
+					if (currentConf != oldConf)
+						reconfigureConns();
+				}
+
+			}
+			if (FD_ISSET(app)) {
+				sendVoicePkts(recvPkts(APP_PORT),
+					      currentConf);
+			}
+			if (FD_ISSET(otherside)) {
+				recvVoicePkts(currentConf);
+			}
 		}
-		if (FD_ISSET(app)) {
-			sendPkts(recvAppPkts());
-		}
-		if (FD_ISSET()){
-			recvPkts();
+		else {
+			err(1, "select()");
 		}
 	}
+	return 127;		/* we mustn't reach this point! */
 }
