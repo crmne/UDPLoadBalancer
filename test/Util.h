@@ -32,6 +32,13 @@
 
 #define MAXNUMCONNECTIONS 3
 
+#ifndef MSG_NOSIGNAL
+#ifdef SO_NOSIGPIPE
+#define MSG_NOSIGNAL SO_NOSIGPIPE
+#else
+#define MSG_NOSIGNAL 0
+#endif
+#endif
 
 #ifdef __UTIL_C__
 #define UTIL_EXTERN
