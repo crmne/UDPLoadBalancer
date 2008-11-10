@@ -3,7 +3,7 @@ LDFLAGS=-lpthread -lm
 CFLAGS=${INCLUDES} -pipe -Wall -Wunused -pedantic -ggdb -DDEBUG
 SUBDIRS=test
 EXECUTABLES=MobileLoadBalancer FixedLoadBalancer
-UNITTESTS=initconn
+UNITTESTS=initconn select
 .PHONY: clean cleanindent $(SUBDIRS)
 
 all: subdirs $(EXECUTABLES)
@@ -24,6 +24,10 @@ FixedLoadBalancer: src/Common.o src/FixedLoadBalancer.o
 
 initconn: src/Common.o utests/initconn.o
 	${CC} ${LDFLAGS} $^ -o $@
+
+select: src/Common.o utests/select.o
+	${CC} ${LDFLAGS} $^ -o $@
+
 
 #GNU indent only
 indent:

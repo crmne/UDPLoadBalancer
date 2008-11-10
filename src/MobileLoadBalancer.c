@@ -18,8 +18,14 @@ int main(int argc, char *argv[])
 	fd_set infds, allsetinfds;
 
 	configSigHandlers();
+
+	FD_ZERO(&allsetinfds);
+
 	monitorSock = connectToMon(MONPORT);
+	FD_SET(monitorSock, &allsetinfds);
+
 	appSock = listenFromApp(APPPORT);
+	FD_SET(appSock, &allsetinfds);
 
 	while (1) {
 		infds = allsetinfds;
