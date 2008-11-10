@@ -4,38 +4,29 @@
 #include "Common.h"
 #define APPPORT 6001
 #define MONPORT 8000
-config_t recvNewConf(socket_t socket)
-{
-
-}
-
-socket_t connectToMon(int port)
-{
-
-}
-
-socket_t connectToApp(int port)
+config_t recvNewConf(int socketfd)
 {
 
 }
 
 int main(int argc, char *argv[])
 {
-	int retsel;
+	int retsel, fd;
 	config_t currentConf, oldConf;
-	socket_t monitorSock, appSock;
+	int monitorData;
+	int monitorSock, appSock;
 	fd_set infds, allsetinfds;
 
 	configSigHandlers();
 	monitorSock = connectToMon(MONPORT);
-	appSock = connectToApp(APPPORT);
+	appSock = listenFromApp(APPPORT);
 
 	while (1) {
 		infds = allsetinfds;
 		retsel = select(fd + 1, &infds, NULL, NULL, NULL);
 		if (retsel > 0) {
-			if (FD_ISSET(monitor)) {
-				monitorData = recvPkts(monitor);
+			if (FD_ISSET(monitorSock, &infds)) {
+				monitorData = recvPkts(monitorSock);
 
 				if (monitorData == NACK)
 					doSomething();
@@ -50,11 +41,10 @@ int main(int argc, char *argv[])
 				}
 
 			}
-			if (FD_ISSET(app)) {
-				sendVoicePkts(recvPkts(APP_PORT),
-					      currentConf);
+			if (FD_ISSET(appSock, &infds)) {
+				sendVoicePkts(recvPkts(APPPORT), currentConf);
 			}
-			if (FD_ISSET(otherside)) {
+			if (FD_ISSET(otherside, &infds)) {
 				recvVoicePkts(currentConf);
 			}
 		}
