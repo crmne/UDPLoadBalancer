@@ -20,11 +20,11 @@ int main(int argc, char *argv[])
 	FD_SET(monitorSock, &allsetinfds);
 
 	listenSock = listenFromApp(APPPORT);
-	appSock = acceptFromApp(listenSock);
-	FD_SET(appSock, &allsetinfds);
+	FD_SET(listenSock, &allsetinfds);
+
+	fd = listenSock;
 
 	while (1) {
-		fd = appSock;
 		infds = allsetinfds;
 		retsel = select(fd + 1, &infds, NULL, NULL, NULL);
 		if (retsel > 0) {
@@ -51,6 +51,11 @@ int main(int argc, char *argv[])
 			if (FD_ISSET(appSock, &infds)) {
 				/*fprintf(stderr, "App "); */
 				/*sendVoicePkts(recvPkts(APPPORT), currentConf); */
+			}
+			if (FD_ISSET(listenSock, &infds)) {
+				appSock = acceptFromApp(listenSock);
+				FD_SET(appSock, &allsetinfds);
+				fd = appSock;
 			}
 			/*if (FD_ISSET(otherside, &infds)) {
 			   recvVoicePkts(currentConf);
