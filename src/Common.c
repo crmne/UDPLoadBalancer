@@ -156,11 +156,11 @@ char recvMonitorPkts(int socketfd, config_t * newconfig)
 #ifdef DEBUG
 	printf("Received new ");
 #endif
-	n = read(socketfd, &answer, sizeof(char));
+	n = read(socketfd, &answer, sizeof(answer));
 	if (n < 1)
 		err(1, "recvMonitorPkts(socketfd=%d,...): read(answer)",
 		    socketfd);
-	n = read(socketfd, &newconfig->n, sizeof(uint32_t));
+	n = read(socketfd, &newconfig->n, sizeof(newconfig->n));
 	if (n < 1)
 		err(1, "recvMonitorPkts(socketfd=%d,...): read(n)", socketfd);
 	switch (answer) {
@@ -202,4 +202,22 @@ char recvMonitorPkts(int socketfd, config_t * newconfig)
 	fflush(stdout);
 #endif
 	return answer;
+}
+
+uint32_t recvVoicePkts(int socketfd, packet_t * packet)
+{
+	int n;
+	n = read(socketfd, &packet->id, sizeof(packet->id));
+	if (n < 1)
+		err(1, "recvVoicePkts(socketfd=%d,...): read(packet->id)",
+		    socketfd);
+	n = read(socketfd, &packet->data, sizeof(packet->data));
+	if (n < 1)
+		err(1, "recvVoicePkts(socketfd=%d,...): read(packet->data)",
+		    socketfd);
+#ifdef DEBUG
+	printf("Received voice packet %u from App\n", packet->id);
+	fflush(stdout);
+#endif
+	return packet->id;
 }

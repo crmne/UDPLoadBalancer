@@ -8,8 +8,10 @@ int main(int argc, char *argv[])
 {
 	int retsel, fd;
 	char monAnswer;
+	uint32_t appAnswer;
 	int monitorSock, listenSock, appSock;
 	config_t oldcfg, newcfg, tempcfg;
+	packet_t prova;		/* FIXME */
 	fd_set infds, allsetinfds;
 
 	configSigHandlers();
@@ -29,8 +31,6 @@ int main(int argc, char *argv[])
 		retsel = select(fd + 1, &infds, NULL, NULL, NULL);
 		if (retsel > 0) {
 			if (FD_ISSET(monitorSock, &infds)) {
-				fprintf(stderr,
-					"Monitor said something...\n");
 				monAnswer =
 					recvMonitorPkts(monitorSock,
 							&tempcfg);
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 */
 			}
 			if (FD_ISSET(appSock, &infds)) {
-				/*fprintf(stderr, "App "); */
+				appAnswer = recvVoicePkts(appSock, &prova);
 				/*sendVoicePkts(recvPkts(APPPORT), currentConf); */
 			}
 			if (FD_ISSET(listenSock, &infds)) {

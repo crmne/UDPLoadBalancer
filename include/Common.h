@@ -12,6 +12,12 @@ typedef struct
 	uint16_t port[MAXPATHS];
 } config_t;
 
+typedef struct
+{
+	uint32_t id;
+	char data[96];
+} packet_t;
+
 void configSigHandlers();
 
 int listenFromApp(int);
