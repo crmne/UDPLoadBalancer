@@ -49,7 +49,7 @@ struct sockaddr_in setSocket4(const char *addr, int port)
 	struct sockaddr_in sock;
 	memset(&sock, 0, sizeof(sock));
 	sock.sin_family = AF_INET;
-	if (inet_aton(addr, &sock.sin_addr.s_addr) == 0)
+	if (inet_aton(addr, &sock.sin_addr) == 0)
 		err(1, "setSocket4(addr=%s,port=%d): inet_aton()", addr,
 		    port);
 	sock.sin_port = htons(port);
@@ -85,7 +85,7 @@ int listenFromApp(int port)
 	printf("Setting up server for App on port %d... ", port);
 #endif
 	socketfd = createSocket4(SOCK_STREAM);
-	sock = setSocket4("0.0.0.0", port);
+	sock = setSocket4("127.0.0.1", port);
 	if (bind(socketfd, (struct sockaddr *) &sock, sizeof(sock)) < 0)
 		err(1, "listenFromApp(port=%d): bind(socketfd=%d)", port,
 		    socketfd);
@@ -107,7 +107,7 @@ int connectToMon(int port)
 	printf("Connecting to Monitor on port %d... ", port);
 #endif
 	socketfd = createSocket4(SOCK_STREAM);
-	local = setSocket4("0.0.0.0", 0);
+	local = setSocket4("127.0.0.1", 0);
 	if (bind(socketfd, (struct sockaddr *) &local, sizeof(local)) < 0)
 		err(1, "connectToMon(port=%d): bind(socketfd=%d)", port,
 		    socketfd);
@@ -129,10 +129,10 @@ int acceptFromApp(int socketfd)
 	unsigned int len;
 	struct sockaddr_in sock;
 #ifdef DEBUG
-	printf("Awaiting connection from App... ");
+	printf("App wants to connect to us... ");
 #endif
-	memset(&sock, 0, sizeof(sock));
 	len = sizeof(sock);
+	memset(&sock, 0, len);
 	newsocketfd = accept(socketfd, (struct sockaddr *) &sock, &len);
 	if (newsocketfd < 0)
 		err(1, "acceptFromApp(socketfd=%d): accept()", socketfd);
@@ -157,11 +157,12 @@ char recvMonitorPkts(int socketfd, config_t * newconfig)
 	printf("Received new ");
 #endif
 	n = read(socketfd, &answer, sizeof(answer));
-	if (n < 1)
+	if (n != sizeof(answer))
 		err(1, "recvMonitorPkts(socketfd=%d,...): read(answer)",
 		    socketfd);
+	newconfig->type = answer;
 	n = read(socketfd, &newconfig->n, sizeof(newconfig->n));
-	if (n < 1)
+	if (n != sizeof(newconfig->n))
 		err(1, "recvMonitorPkts(socketfd=%d,...): read(n)", socketfd);
 	switch (answer) {
 	case 'C':
@@ -170,8 +171,8 @@ char recvMonitorPkts(int socketfd, config_t * newconfig)
 #endif
 		for (i = 0; i < newconfig->n; i++) {
 			n = read(socketfd, &newconfig->port[i],
-				 sizeof(uint16_t));
-			if (n < 1)
+				 sizeof(newconfig->port[i]));
+			if (n != sizeof(newconfig->port[i]))
 				err(1,
 				    "recvMonitorPkts(socketfd=%d,...): read(port[%d])",
 				    socketfd, i);
@@ -208,16 +209,74 @@ uint32_t recvVoicePkts(int socketfd, packet_t * packet)
 {
 	int n;
 	n = read(socketfd, &packet->id, sizeof(packet->id));
-	if (n < 1)
+	if (n != sizeof(packet->id))
 		err(1, "recvVoicePkts(socketfd=%d,...): read(packet->id)",
 		    socketfd);
+	n = read(socketfd, &packet->time, sizeof(packet->time));
+	if (n != sizeof(packet->time))
+		err(1, "recvVoicePkts(socketfd=%d,...): read(packet->time)",
+		    socketfd);
 	n = read(socketfd, &packet->data, sizeof(packet->data));
-	if (n < 1)
+	if (n != PKTSIZE - sizeof(packet->id) - sizeof(packet->time))
 		err(1, "recvVoicePkts(socketfd=%d,...): read(packet->data)",
 		    socketfd);
 #ifdef DEBUG
-	printf("Received voice packet %u from App\n", packet->id);
+	printf("Received voice packet %u\n", packet->id);	/* TODO: from who? */
 	fflush(stdout);
 #endif
 	return packet->id;
+}
+
+void sendVoicePkts(int socketfd, packet_t * packet)
+{
+	int n;
+	n = write(socketfd, &packet, sizeof(*packet));
+	if (n != PKTSIZE)
+		err(1, "sendVoicePkts(socketfd=%d,...): write(packet)%d",
+		    socketfd, sizeof(*packet));
+#ifdef DEBUG
+	printf("Sending voice packet %u to Peer\n", packet->id);
+	fflush(stdout);
+#endif
+
+}
+
+void reconfigRoutes(config_t * oldcfg, config_t * newcfg, fd_set * fdset,
+		    int *maxfd)
+{
+	struct sockaddr_in addr_in;
+	int i;
+	for (i = 0; i < oldcfg->n; i++) {
+		close(oldcfg->socket[i]);
+		FD_CLR(oldcfg->socket[i], fdset);
+	}
+	for (i = 0; i < newcfg->n; i++) {
+		newcfg->socket[i] = createSocket4(SOCK_DGRAM);
+		addr_in = setSocket4("127.0.0.1", newcfg->port[i]);
+		if (connect
+		    (newcfg->socket[i], (struct sockaddr *) &addr_in,
+		     sizeof(addr_in)) < 0)
+			err(1,
+			    "reconfigRoutes(...): connect(port=%d,socketfd=%d)",
+			    newcfg->port[i], newcfg->socket[i]);
+		FD_SET(newcfg->socket[i], fdset);
+	}
+	if (newcfg->n > 0)
+		*maxfd = newcfg->socket[i];
+}
+
+int listenUDP4(int port)
+{
+	struct sockaddr_in addr_in;
+	int socketfd = createSocket4(SOCK_DGRAM);
+	addr_in = setSocket4("127.0.0.1", port);
+	if (bind(socketfd, (struct sockaddr *) &addr_in, sizeof(addr_in)) < 0)
+		err(1, "listenFromApp(port=%d): bind(socketfd=%d)", port,
+		    socketfd);
+	return socketfd;
+}
+
+void doSomething()
+{
+	fprintf(stderr, "...\n");
 }

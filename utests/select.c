@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
 	uint32_t appAnswer;
 	int monitorSock, listenSock, appSock;
 	config_t oldcfg, newcfg, tempcfg;
-	packet_t prova;		/* FIXME */
+	packet_t prova;
 	fd_set infds, allsetinfds;
 
 	configSigHandlers();
@@ -34,32 +34,15 @@ int main(int argc, char *argv[])
 				monAnswer =
 					recvMonitorPkts(monitorSock,
 							&tempcfg);
-/*
-				   if (monitorData == 'N')
-				   doSomething();
-				   else if (monitorData == 'A')
-				   doSomething();
-
-				   else {
-				   oldConf = currentConf;
-				   currentConf = monitorData;
-				   if (currentConf != oldConf)
-				   reconfigureConns();
-				   }
-*/
 			}
 			if (FD_ISSET(appSock, &infds)) {
 				appAnswer = recvVoicePkts(appSock, &prova);
-				/*sendVoicePkts(recvPkts(APPPORT), currentConf); */
 			}
 			if (FD_ISSET(listenSock, &infds)) {
 				appSock = acceptFromApp(listenSock);
 				FD_SET(appSock, &allsetinfds);
 				fd = appSock;
 			}
-			/*if (FD_ISSET(otherside, &infds)) {
-			   recvVoicePkts(currentConf);
-			   } */
 		}
 		else {
 			err(1, "select()");

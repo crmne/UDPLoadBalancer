@@ -1,57 +1,65 @@
 #include <stdio.h>
 #include <err.h>
 #include <sys/select.h>
+#include <string.h>
 #include "Common.h"
 #define APPPORT 6001
+#define PEERPORT 7001
 #define MONPORT 8000
-config_t recvNewConf(int socketfd)
-{
-
-}
-
 int main(int argc, char *argv[])
 {
-	int retsel, fd;
-	config_t currentConf, oldConf;
-	int monitorData;
-	int monitorSock, appSock;
+	int retsel, maxfd;
+	char monAnswer;
+	uint32_t appAnswer;
+	int monitorSock, appSock, peerSock;
+	config_t oldcfg, newcfg, tmpcfg;
+	packet_t prova;
 	fd_set infds, allsetinfds;
 
 	configSigHandlers();
-
+	memset(&newcfg, 0, sizeof(newcfg));
 	FD_ZERO(&allsetinfds);
 
 	monitorSock = connectToMon(MONPORT);
 	FD_SET(monitorSock, &allsetinfds);
 
-	appSock = listenFromApp(APPPORT);
+	appSock = acceptFromApp(listenFromApp(APPPORT));
 	FD_SET(appSock, &allsetinfds);
+
+	peerSock = listenUDP4(PEERPORT);
+	FD_SET(peerSock, &allsetinfds);
+
+	maxfd = peerSock;
 
 	while (1) {
 		infds = allsetinfds;
-		retsel = select(fd + 1, &infds, NULL, NULL, NULL);
+		retsel = select(maxfd + 1, &infds, NULL, NULL, NULL);
 		if (retsel > 0) {
 			if (FD_ISSET(monitorSock, &infds)) {
-				monitorData = recvPkts(monitorSock);
-
-				if (monitorData == NACK)
+				monAnswer =
+					recvMonitorPkts(monitorSock, &tmpcfg);
+				switch (monAnswer) {
+				case 'A':
 					doSomething();
-				else if (monitorData == ACK)
+					break;
+				case 'N':
 					doSomething();
-
-				else {
-					oldConf = currentConf;
-					currentConf = monitorData;
-					if (currentConf != oldConf)
-						reconfigureConns();
+					break;
+				case 'C':
+					oldcfg = newcfg;
+					newcfg = tmpcfg;
+					maxfd = peerSock;	/* ugly! */
+					reconfigRoutes(&oldcfg, &newcfg,
+						       &allsetinfds, &maxfd);
+					break;
 				}
-
 			}
 			if (FD_ISSET(appSock, &infds)) {
-				sendVoicePkts(recvPkts(APPPORT), currentConf);
+				appAnswer = recvVoicePkts(appSock, &prova);
+				sendVoicePkts(newcfg.socket[0], &prova);	/* TODO select path */
 			}
-			if (FD_ISSET(otherside, &infds)) {
-				recvVoicePkts(currentConf);
+			if (FD_ISSET(peerSock, &infds)) {
+				recvVoicePkts(peerSock, &prova);	/* TODO */
 			}
 		}
 		else {

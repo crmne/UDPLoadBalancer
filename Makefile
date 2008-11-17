@@ -35,7 +35,7 @@ indent:
 cleanindent:
 	-rm -f src/*.c~ include/*.h~ utests/*.c~
 clean:	cleanindent
-	-rm -f core* *.stackdump delaymobile.txt
+	-rm -f core* *.stackdump delaymobile.txt delayfixed.txt
 	-rm -f $(EXECUTABLES) src/*.o
 	-rm -f $(UNITTESTS) utests/*.o
 	$(MAKE) -C $(SUBDIRS) clean
