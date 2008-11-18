@@ -26,9 +26,6 @@ int signalHandler(int signum)
 void configSigHandlers()
 {
 	struct sigaction act;
-#ifdef DEBUG
-	printf("Setting up signal handlers... ");
-#endif
 	sigemptyset(&act.sa_mask);
 	act.sa_flags = SA_SIGINFO;	/* maybe not needed */
 	act.sa_sigaction = signalHandler;
@@ -37,8 +34,10 @@ void configSigHandlers()
 		err(1, "failed to set SIGINT handler");
 	if (sigaction(SIGTERM, &act, NULL) < 0)
 		err(1, "failed to set SIGTERM handler");
+	if (sigaction(SIGHUP, &act, NULL) < 0)
+		err(1, "failed to set SIGINT handler");
 #ifdef DEBUG
-	printf("OK\n");
+	printf("Signal handlers setup OK\n");
 	fflush(stdout);
 #endif
 
@@ -81,9 +80,6 @@ int listenFromApp(int port)
 {
 	struct sockaddr_in sock;
 	int socketfd;
-#ifdef DEBUG
-	printf("Setting up server for App on port %d... ", port);
-#endif
 	socketfd = createSocket4(SOCK_STREAM);
 	sock = setSocket4("127.0.0.1", port);
 	if (bind(socketfd, (struct sockaddr *) &sock, sizeof(sock)) < 0)
@@ -93,7 +89,7 @@ int listenFromApp(int port)
 		err(1, "listenFromApp(port=%d): listen(socketfd=%d)", port,
 		    socketfd);
 #ifdef DEBUG
-	printf("OK\n");
+	printf("Waiting for App on port %d...\n", port);
 	fflush(stdout);
 #endif
 	return socketfd;
@@ -103,9 +99,6 @@ int connectToMon(int port)
 {
 	struct sockaddr_in local, serv;
 	int socketfd;
-#ifdef DEBUG
-	printf("Connecting to Monitor on port %d... ", port);
-#endif
 	socketfd = createSocket4(SOCK_STREAM);
 	local = setSocket4("127.0.0.1", 0);
 	if (bind(socketfd, (struct sockaddr *) &local, sizeof(local)) < 0)
@@ -117,7 +110,7 @@ int connectToMon(int port)
 		err(1, "connectToMon(port=%d): connect(socketfd=%d)", port,
 		    socketfd);
 #ifdef DEBUG
-	printf("OK\n");
+	printf("Connected to Monitor on port %d\n", port);
 	fflush(stdout);
 #endif
 	return socketfd;
@@ -128,16 +121,13 @@ int acceptFromApp(int socketfd)
 	int newsocketfd;
 	unsigned int len;
 	struct sockaddr_in sock;
-#ifdef DEBUG
-	printf("App wants to connect to us... ");
-#endif
 	len = sizeof(sock);
 	memset(&sock, 0, len);
 	newsocketfd = accept(socketfd, (struct sockaddr *) &sock, &len);
 	if (newsocketfd < 0)
 		err(1, "acceptFromApp(socketfd=%d): accept()", socketfd);
 #ifdef DEBUG
-	printf("Connected!\n");
+	printf("Connected to App\n");
 	fflush(stdout);
 #endif
 	return newsocketfd;
@@ -233,14 +223,12 @@ void sendVoicePkts(int socketfd, packet_t * packet)
 
 }
 
-void reconfigRoutes(config_t * oldcfg, config_t * newcfg, fd_set * fdset,
-		    int *maxfd)
+void reconfigRoutes(config_t * oldcfg, config_t * newcfg)
 {
 	struct sockaddr_in addr_in;
 	int i;
 	for (i = 0; i < oldcfg->n; i++) {
 		close(oldcfg->socket[i]);
-		FD_CLR(oldcfg->socket[i], fdset);
 	}
 	for (i = 0; i < newcfg->n; i++) {
 		newcfg->socket[i] = createSocket4(SOCK_DGRAM);
@@ -251,10 +239,7 @@ void reconfigRoutes(config_t * oldcfg, config_t * newcfg, fd_set * fdset,
 			err(1,
 			    "reconfigRoutes(...): connect(port=%d,socketfd=%d)",
 			    newcfg->port[i], newcfg->socket[i]);
-		FD_SET(newcfg->socket[i], fdset);
 	}
-	if (newcfg->n > 0)
-		*maxfd = newcfg->socket[i];
 }
 
 int listenUDP4(int port)
@@ -266,6 +251,13 @@ int listenUDP4(int port)
 		err(1, "listenFromApp(port=%d): bind(socketfd=%d)", port,
 		    socketfd);
 	return socketfd;
+}
+
+
+/* TODO and move in a new file */
+int selectPath(config_t * config)
+{
+	return config->socket[0];
 }
 
 void doSomething()

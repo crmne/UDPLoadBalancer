@@ -29,11 +29,13 @@ int main(int argc, char *argv[])
 		if (retsel > 0) {
 			if (FD_ISSET(peerSock, &infds)) {
 				recvVoicePkts(peerSock, &peerPkt);
+				/* TODO: sort packets */
 				sendVoicePkts(appSock, &peerPkt);
 			}
 			if (FD_ISSET(appSock, &infds)) {
 				appAnswer = recvVoicePkts(appSock, &appPkt);
-				sendVoicePkts(peerSock, &appPkt);
+				/* TODO: find best route */
+				/*sendVoicePkts(peerSock, &appPkt); */
 			}
 		}
 		else {

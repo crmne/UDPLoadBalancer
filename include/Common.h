@@ -30,7 +30,7 @@ int connectToMon(int);
 char recvMonitorPkts(int, config_t *);
 uint32_t recvVoicePkts(int, packet_t *);
 void sendVoicePkts(int, packet_t *);
-void reconfigRoutes(config_t *, config_t *, fd_set *, int *);
+void reconfigRoutes(config_t *, config_t *);
 int listenUDP4(int);
 
 void doSomething();

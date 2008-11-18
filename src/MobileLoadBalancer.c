@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
 {
 	int retsel, maxfd;
 	char monAnswer;
-	uint32_t appAnswer;
+	uint32_t appPktId, peerPktId;
 	int monitorSock, appSock, peerSock;
 	config_t oldcfg, newcfg, tmpcfg;
 	packet_t appPkt, peerPkt;
@@ -48,18 +48,17 @@ int main(int argc, char *argv[])
 				case 'C':
 					oldcfg = newcfg;
 					newcfg = tmpcfg;
-					maxfd = peerSock;	/* ugly! */
-					reconfigRoutes(&oldcfg, &newcfg,
-						       &allsetinfds, &maxfd);
+					reconfigRoutes(&oldcfg, &newcfg);
 					break;
 				}
 			}
 			if (FD_ISSET(appSock, &infds)) {
-				appAnswer = recvVoicePkts(appSock, &appPkt);
-				sendVoicePkts(newcfg.socket[0], &appPkt);	/* TODO select path */
+				appPktId = recvVoicePkts(appSock, &appPkt);
+				sendVoicePkts(selectPath(&newcfg), &appPkt);
 			}
 			if (FD_ISSET(peerSock, &infds)) {
-				recvVoicePkts(peerSock, &peerPkt);	/* TODO */
+				peerPktId = recvVoicePkts(peerSock, &peerPkt);
+				/* TODO: sort packets */
 				sendVoicePkts(appSock, &peerPkt);
 			}
 		}
