@@ -13,7 +13,7 @@ int main(int argc, char *argv[])
 	uint32_t appAnswer;
 	int monitorSock, appSock, peerSock;
 	config_t oldcfg, newcfg, tmpcfg;
-	packet_t prova;
+	packet_t appPkt, peerPkt;
 	fd_set infds, allsetinfds;
 
 	configSigHandlers();
@@ -55,11 +55,12 @@ int main(int argc, char *argv[])
 				}
 			}
 			if (FD_ISSET(appSock, &infds)) {
-				appAnswer = recvVoicePkts(appSock, &prova);
-				sendVoicePkts(newcfg.socket[0], &prova);	/* TODO select path */
+				appAnswer = recvVoicePkts(appSock, &appPkt);
+				sendVoicePkts(newcfg.socket[0], &appPkt);	/* TODO select path */
 			}
 			if (FD_ISSET(peerSock, &infds)) {
-				recvVoicePkts(peerSock, &prova);	/* TODO */
+				recvVoicePkts(peerSock, &peerPkt);	/* TODO */
+				sendVoicePkts(appSock, &peerPkt);
 			}
 		}
 		else {

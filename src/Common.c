@@ -208,17 +208,9 @@ char recvMonitorPkts(int socketfd, config_t * newconfig)
 uint32_t recvVoicePkts(int socketfd, packet_t * packet)
 {
 	int n;
-	n = read(socketfd, &packet->id, sizeof(packet->id));
-	if (n != sizeof(packet->id))
-		err(1, "recvVoicePkts(socketfd=%d,...): read(packet->id)",
-		    socketfd);
-	n = read(socketfd, &packet->time, sizeof(packet->time));
-	if (n != sizeof(packet->time))
-		err(1, "recvVoicePkts(socketfd=%d,...): read(packet->time)",
-		    socketfd);
-	n = read(socketfd, &packet->data, sizeof(packet->data));
-	if (n != PKTSIZE - sizeof(packet->id) - sizeof(packet->time))
-		err(1, "recvVoicePkts(socketfd=%d,...): read(packet->data)",
+	n = read(socketfd, packet, sizeof(*packet));
+	if (n != sizeof(*packet))
+		err(1, "recvVoicePkts(socketfd=%d,...): read(packet)",
 		    socketfd);
 #ifdef DEBUG
 	printf("Received voice packet %u\n", packet->id);	/* TODO: from who? */
@@ -230,8 +222,8 @@ uint32_t recvVoicePkts(int socketfd, packet_t * packet)
 void sendVoicePkts(int socketfd, packet_t * packet)
 {
 	int n;
-	n = write(socketfd, &packet, sizeof(*packet));
-	if (n != PKTSIZE)
+	n = write(socketfd, packet, sizeof(*packet));
+	if (n != sizeof(*packet))
 		err(1, "sendVoicePkts(socketfd=%d,...): write(packet)%d",
 		    socketfd, sizeof(*packet));
 #ifdef DEBUG

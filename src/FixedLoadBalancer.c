@@ -9,7 +9,7 @@ int main(int argc, char *argv[])
 	int retsel, maxfd;
 	uint32_t appAnswer;
 	int appSock, peerSock;
-	packet_t prova;
+	packet_t appPkt, peerPkt;
 	fd_set infds, allsetinfds;
 
 	configSigHandlers();
@@ -28,11 +28,12 @@ int main(int argc, char *argv[])
 		retsel = select(maxfd + 1, &infds, NULL, NULL, NULL);
 		if (retsel > 0) {
 			if (FD_ISSET(peerSock, &infds)) {
-				recvVoicePkts(peerSock, &prova);
+				recvVoicePkts(peerSock, &peerPkt);
+				sendVoicePkts(appSock, &peerPkt);
 			}
 			if (FD_ISSET(appSock, &infds)) {
-				appAnswer = recvVoicePkts(appSock, &prova);
-				/*sendVoicePkts(newcfg.socket[0], &prova); */
+				appAnswer = recvVoicePkts(appSock, &appPkt);
+				sendVoicePkts(peerSock, &appPkt);
 			}
 		}
 		else {
