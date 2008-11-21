@@ -2,6 +2,7 @@
 #define __COMMON_H__
 
 #include <stdint.h>
+#include <sys/time.h>
 
 #define MAXCONNECTIONS 1
 #define MAXPATHS 3
@@ -20,6 +21,7 @@ typedef struct
 	uint32_t id;
 	struct timeval time;
 	char data[PKTSIZE - sizeof(uint32_t) - sizeof(struct timeval)];
+	struct packet_t *next;
 } packet_t;
 
 void configSigHandlers();

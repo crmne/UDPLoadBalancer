@@ -9,17 +9,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "Common.h"
-void flushQueues()
-{
-	fprintf(stderr, "flushQueues() is a stub!\n");
-	/* TODO: close fds? */
-}
-
 int signalHandler(int signum)
 {
-	fprintf(stderr, "\nReceived signal %d\n", signum);
-	flushQueues();
-	exit(0);
+	errx(signum, "\nReceived signal %d\n", signum);
 }
 
 /** Configure signal handlers */
@@ -198,10 +190,20 @@ char recvMonitorPkts(int socketfd, config_t * newconfig)
 uint32_t recvVoicePkts(int socketfd, packet_t * packet)
 {
 	int n;
-	n = read(socketfd, packet, sizeof(*packet));
-	if (n != sizeof(*packet))
-		err(1, "recvVoicePkts(socketfd=%d,...): read(packet)",
-		    socketfd);
+	char ppacket[PKTSIZE];
+	n = read(socketfd, &ppacket, sizeof(ppacket));
+	if (n == 0)
+		errx(2, "Nothing received, maybe the other end is down? Exiting.");
+	if (n != sizeof(ppacket))
+		err(1,
+		    "recvVoicePkts(socketfd=%d,...): read(packet)=%d",
+		    socketfd, n);
+	memcpy(&packet->id, &ppacket, sizeof(packet->id));
+	memcpy(&packet->time, &ppacket + sizeof(packet->id),
+	       sizeof(packet->time));
+	memcpy(&packet->data,
+	       &ppacket + sizeof(packet->id) + sizeof(packet->time),
+	       sizeof(packet->data));
 #ifdef DEBUG
 	printf("Received voice packet %u\n", packet->id);	/* TODO: from who? */
 	fflush(stdout);
@@ -212,10 +214,16 @@ uint32_t recvVoicePkts(int socketfd, packet_t * packet)
 void sendVoicePkts(int socketfd, packet_t * packet)
 {
 	int n;
-	n = write(socketfd, packet, sizeof(*packet));
-	if (n != sizeof(*packet))
+	char ppacket[PKTSIZE];
+	memcpy(&ppacket, &packet->id, sizeof(packet->id));
+	memcpy(&ppacket + sizeof(packet->id), &packet->time,
+	       sizeof(packet->time));
+	memcpy(&ppacket + sizeof(packet->id) + sizeof(packet->time),
+	       &packet->data, sizeof(packet->data));
+	n = write(socketfd, &ppacket, sizeof(ppacket));
+	if (n != sizeof(ppacket))
 		err(1, "sendVoicePkts(socketfd=%d,...): write(packet)%d",
-		    socketfd, sizeof(*packet));
+		    socketfd, sizeof(ppacket));
 #ifdef DEBUG
 	printf("Sending voice packet %u to Peer\n", packet->id);
 	fflush(stdout);
