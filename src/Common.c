@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "Common.h"
+#include "Queues.h"
 int signalHandler(int signum)
 {
 	errx(signum, "\nReceived signal %d\n", signum);
@@ -17,6 +18,7 @@ int signalHandler(int signum)
 /** Configure signal handlers */
 void configSigHandlers()
 {
+#ifdef SIGHANDLER
 	struct sigaction act;
 	sigemptyset(&act.sa_mask);
 	act.sa_flags = SA_SIGINFO;	/* maybe not needed */
@@ -32,7 +34,7 @@ void configSigHandlers()
 	printf("Signal handlers setup OK\n");
 	fflush(stdout);
 #endif
-
+#endif
 }
 
 struct sockaddr_in setSocket4(const char *addr, int port)
@@ -193,7 +195,8 @@ uint32_t recvVoicePkts(int socketfd, packet_t * packet)
 	char ppacket[PKTSIZE];
 	n = read(socketfd, &ppacket, sizeof(ppacket));
 	if (n == 0)
-		errx(2, "Nothing received, maybe the other end is down? Exiting.");
+		errx(2,
+		     "Nothing received, maybe the other end is down? Exiting.");
 	if (n != sizeof(ppacket))
 		err(1,
 		    "recvVoicePkts(socketfd=%d,...): read(packet)=%d",
@@ -204,6 +207,7 @@ uint32_t recvVoicePkts(int socketfd, packet_t * packet)
 	memcpy(&packet->data,
 	       &ppacket + sizeof(packet->id) + sizeof(packet->time),
 	       sizeof(packet->data));
+	packet->next = NULL;
 #ifdef DEBUG
 	printf("Received voice packet %u\n", packet->id);	/* TODO: from who? */
 	fflush(stdout);
@@ -222,8 +226,9 @@ void sendVoicePkts(int socketfd, packet_t * packet)
 	       &packet->data, sizeof(packet->data));
 	n = write(socketfd, &ppacket, sizeof(ppacket));
 	if (n != sizeof(ppacket))
-		err(1, "sendVoicePkts(socketfd=%d,...): write(packet)%d",
+		err(1, "sendVoicePkts(socketfd=%d,...): write(packet)%lu",
 		    socketfd, sizeof(ppacket));
+	free(packet);
 #ifdef DEBUG
 	printf("Sending voice packet %u to Peer\n", packet->id);
 	fflush(stdout);
@@ -261,11 +266,26 @@ int listenUDP4(int port)
 	return socketfd;
 }
 
-
-/* TODO and move in a new file */
-int selectPath(config_t * config)
+uint32_t sendPktsToApp(int appSock, packet_t * peerPkt, packet_t * pktQueue,
+		       uint32_t expPktId)
 {
-	return config->socket[0];
+	packet_t *first;
+	uint32_t i = 0;
+	if (peerPkt->id == expPktId) {
+		sendVoicePkts(appSock, peerPkt);
+		i = 1;
+		while ((first = getFirstInQ(&pktQueue)) != NULL
+		       && first->id == expPktId + i) {
+			sendVoicePkts(appSock, first);
+			i++;
+		}
+		/*sendAckToPeer();*/
+	}
+	else {
+		insertInQ(&pktQueue, peerPkt);
+		/*sendNackToPeer();*/
+	}
+	return i;
 }
 
 void doSomething()

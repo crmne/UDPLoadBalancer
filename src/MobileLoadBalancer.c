@@ -1,19 +1,23 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <err.h>
 #include <sys/select.h>
 #include <string.h>
 #include "Common.h"
+#include "Proto.h"
+
 #define APPPORT 6001
 #define PEERPORT 7001
 #define MONPORT 8000
+
 int main(int argc, char *argv[])
 {
 	int retsel, maxfd;
 	char monAnswer;
-	uint32_t appPktId, peerPktId;
+	uint32_t appPktId, peerPktId, expPktId = 0;
 	int monitorSock, appSock, peerSock;
 	config_t oldcfg, newcfg, tmpcfg;
-	packet_t appPkt, peerPkt;
+	packet_t *appPkt, *peerPkt, *pktQueue = NULL;
 	fd_set infds, allsetinfds;
 
 	configSigHandlers();
@@ -40,10 +44,10 @@ int main(int argc, char *argv[])
 					recvMonitorPkts(monitorSock, &tmpcfg);
 				switch (monAnswer) {
 				case 'A':
-					doSomething();
+					manageMonAck();
 					break;
 				case 'N':
-					doSomething();
+					manageMonNack();
 					break;
 				case 'C':
 					oldcfg = newcfg;
@@ -53,13 +57,16 @@ int main(int argc, char *argv[])
 				}
 			}
 			if (FD_ISSET(appSock, &infds)) {
-				appPktId = recvVoicePkts(appSock, &appPkt);
-				sendVoicePkts(selectPath(&newcfg), &appPkt);
+				appPkt = (packet_t *) malloc(sizeof(packet_t));
+				appPktId = recvVoicePkts(appSock, appPkt);
+				sendVoicePkts(selectPath(&newcfg), appPkt);
 			}
 			if (FD_ISSET(peerSock, &infds)) {
-				peerPktId = recvVoicePkts(peerSock, &peerPkt);
-				/* TODO: sort packets */
-				sendVoicePkts(appSock, &peerPkt);
+				peerPkt = (packet_t *) malloc(sizeof(packet_t));
+				peerPktId = recvVoicePkts(peerSock, peerPkt);
+				expPktId +=
+					sendPktsToApp(appSock, peerPkt,
+						      pktQueue, expPktId);
 			}
 		}
 		else {

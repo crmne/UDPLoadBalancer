@@ -2,8 +2,10 @@ INCLUDES=-Iinclude
 LDFLAGS=-lpthread -lm
 CFLAGS=${INCLUDES} -pipe -Wall -Wunused -pedantic -ggdb -DDEBUG
 SUBDIRS=test
+PROTOCOL=DumbProto
+CORE=src/Common.o src/Queues.o src/$(PROTOCOL).o
 EXECUTABLES=MobileLoadBalancer FixedLoadBalancer
-UNITTESTS=initconn select
+UNITTESTS=initconn select queues
 .PHONY: clean cleanindent $(SUBDIRS)
 
 all: subdirs $(EXECUTABLES)
@@ -17,16 +19,20 @@ $(SUBDIRS):
 
 %.c.o:
 
-MobileLoadBalancer: src/Common.o src/MobileLoadBalancer.o
+MobileLoadBalancer: $(CORE) src/MobileLoadBalancer.o
 	${CC} ${LDFLAGS} $^ -o $@
-FixedLoadBalancer: src/Common.o src/FixedLoadBalancer.o
-	${CC} ${LDFLAGS} $^ -o $@
-
-initconn: src/Common.o utests/initconn.o
+FixedLoadBalancer: $(CORE) src/FixedLoadBalancer.o
 	${CC} ${LDFLAGS} $^ -o $@
 
-select: src/Common.o utests/select.o
+initconn: $(CORE) utests/initconn.o
 	${CC} ${LDFLAGS} $^ -o $@
+
+select: $(CORE) utests/select.o
+	${CC} ${LDFLAGS} $^ -o $@
+
+queues: $(CORE) utests/queues.o
+	${CC} ${LDFLAGS} $^ -o $@
+
 
 
 #GNU indent only

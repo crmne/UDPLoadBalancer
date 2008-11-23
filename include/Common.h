@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <sys/time.h>
 
+/* I do not want to include stdio.h just for NULL */
+#ifndef NULL
+#define NULL (void *) 0
+#endif
 #define MAXCONNECTIONS 1
 #define MAXPATHS 3
 #define PKTSIZE 100
@@ -34,6 +38,8 @@ uint32_t recvVoicePkts(int, packet_t *);
 void sendVoicePkts(int, packet_t *);
 void reconfigRoutes(config_t *, config_t *);
 int listenUDP4(int);
+uint32_t sendPktsToApp(int, packet_t *, packet_t *, uint32_t);
+
 
 void doSomething();
 #endif
