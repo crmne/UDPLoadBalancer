@@ -189,6 +189,14 @@ char recvMonitorPkts(int socketfd, config_t * newconfig)
 	return answer;
 }
 
+double calcDelay(struct timeval older)
+{
+	struct timeval now;
+	gettimeofday(&now, NULL);
+	return (double) (now.tv_sec - older.tv_sec) +
+		(double) (now.tv_usec - older.tv_usec) / 1000000.0;
+}
+
 uint32_t recvVoicePkts(int socketfd, packet_t * packet)
 {
 	int n;
@@ -202,14 +210,14 @@ uint32_t recvVoicePkts(int socketfd, packet_t * packet)
 		    "recvVoicePkts(socketfd=%d,...): read(packet)=%d",
 		    socketfd, n);
 	memcpy(&packet->id, &ppacket, sizeof(packet->id));
-	memcpy(&packet->time, &ppacket + sizeof(packet->id),
+	memcpy(&packet->time, (char *) &ppacket + sizeof(packet->id),
 	       sizeof(packet->time));
 	memcpy(&packet->data,
-	       &ppacket + sizeof(packet->id) + sizeof(packet->time),
+	       (char *) &ppacket + sizeof(packet->id) + sizeof(packet->time),
 	       sizeof(packet->data));
 	packet->next = NULL;
 #ifdef DEBUG
-	printf("Received voice packet %u\n", packet->id);	/* TODO: from who? */
+	printf("Received voice packet %u, delay = %f\n", packet->id, calcDelay(packet->time));	/* TODO: from who? */
 	fflush(stdout);
 #endif
 	return packet->id;
@@ -220,9 +228,9 @@ void sendVoicePkts(int socketfd, packet_t * packet)
 	int n;
 	char ppacket[PKTSIZE];
 	memcpy(&ppacket, &packet->id, sizeof(packet->id));
-	memcpy(&ppacket + sizeof(packet->id), &packet->time,
+	memcpy((char *) &ppacket + sizeof(packet->id), &packet->time,
 	       sizeof(packet->time));
-	memcpy(&ppacket + sizeof(packet->id) + sizeof(packet->time),
+	memcpy((char *) &ppacket + sizeof(packet->id) + sizeof(packet->time),
 	       &packet->data, sizeof(packet->data));
 	n = write(socketfd, &ppacket, sizeof(ppacket));
 	if (n != sizeof(ppacket))
@@ -230,7 +238,8 @@ void sendVoicePkts(int socketfd, packet_t * packet)
 		    socketfd, sizeof(ppacket));
 	free(packet);
 #ifdef DEBUG
-	printf("Sending voice packet %u to Peer\n", packet->id);
+	printf("Sending voice packet %u, delay = %f\n", packet->id,
+	       calcDelay(packet->time));
 	fflush(stdout);
 #endif
 
@@ -279,11 +288,11 @@ uint32_t sendPktsToApp(int appSock, packet_t * peerPkt, packet_t * pktQueue,
 			sendVoicePkts(appSock, first);
 			i++;
 		}
-		/*sendAckToPeer();*/
+		/*sendAckToPeer(); */
 	}
 	else {
 		insertInQ(&pktQueue, peerPkt);
-		/*sendNackToPeer();*/
+		/*sendNackToPeer(); */
 	}
 	return i;
 }

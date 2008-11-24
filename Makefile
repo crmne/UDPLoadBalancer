@@ -5,7 +5,7 @@ SUBDIRS=test
 PROTOCOL=DumbProto
 CORE=src/Common.o src/Queues.o src/$(PROTOCOL).o
 EXECUTABLES=MobileLoadBalancer FixedLoadBalancer
-UNITTESTS=initconn select queues
+UNITTESTS=initconn select queues memcpy
 .PHONY: clean cleanindent $(SUBDIRS)
 
 all: subdirs $(EXECUTABLES)
@@ -32,6 +32,10 @@ select: $(CORE) utests/select.o
 
 queues: $(CORE) utests/queues.o
 	${CC} ${LDFLAGS} $^ -o $@
+
+memcpy: $(CORE) utests/memcpy.o
+	${CC} ${LDFLAGS} $^ -o $@
+
 
 
 

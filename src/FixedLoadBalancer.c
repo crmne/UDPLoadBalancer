@@ -30,7 +30,8 @@ int main(int argc, char *argv[])
 		retsel = select(maxfd + 1, &infds, NULL, NULL, NULL);
 		if (retsel > 0) {
 			if (FD_ISSET(peerSock, &infds)) {
-				peerPkt = (packet_t *) malloc(sizeof(packet_t));
+				peerPkt =
+					(packet_t *) malloc(sizeof(packet_t));
 				recvVoicePkts(peerSock, peerPkt);
 				expPktId +=
 					sendPktsToApp(appSock, peerPkt,
@@ -38,7 +39,8 @@ int main(int argc, char *argv[])
 				warnx("expPktId=%u", expPktId);
 			}
 			if (FD_ISSET(appSock, &infds)) {
-				appPkt = (packet_t *) malloc(sizeof(packet_t));
+				appPkt = (packet_t *)
+					malloc(sizeof(packet_t));
 				appAnswer = recvVoicePkts(appSock, appPkt);
 				/* TODO: find best route */
 			}

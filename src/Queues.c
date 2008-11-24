@@ -17,7 +17,8 @@ void insertInQ(packet_t ** pktQueue, packet_t * packet)
 					current = (packet_t *) current->next;
 				}
 				else {
-					current->next = (struct packet_t *) packet;
+					current->next =
+						(struct packet_t *) packet;
 					current = NULL;
 				}
 			}
@@ -26,7 +27,8 @@ void insertInQ(packet_t ** pktQueue, packet_t * packet)
 					*pktQueue = packet;
 				}
 				else {
-					prev->next = (struct packet_t *) packet;
+					prev->next =
+						(struct packet_t *) packet;
 				}
 				packet->next = (struct packet_t *) current;
 				current = NULL;

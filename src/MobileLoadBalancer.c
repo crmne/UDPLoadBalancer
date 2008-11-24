@@ -57,12 +57,14 @@ int main(int argc, char *argv[])
 				}
 			}
 			if (FD_ISSET(appSock, &infds)) {
-				appPkt = (packet_t *) malloc(sizeof(packet_t));
+				appPkt = (packet_t *)
+					malloc(sizeof(packet_t));
 				appPktId = recvVoicePkts(appSock, appPkt);
 				sendVoicePkts(selectPath(&newcfg), appPkt);
 			}
 			if (FD_ISSET(peerSock, &infds)) {
-				peerPkt = (packet_t *) malloc(sizeof(packet_t));
+				peerPkt =
+					(packet_t *) malloc(sizeof(packet_t));
 				peerPktId = recvVoicePkts(peerSock, peerPkt);
 				expPktId +=
 					sendPktsToApp(appSock, peerPkt,
