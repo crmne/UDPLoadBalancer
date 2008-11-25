@@ -137,10 +137,9 @@ char recvMonitorPkts(int socketfd, config_t * newconfig)
 {
 	int n, i;
 	char answer;
-#ifdef DEBUG
-	printf("Received new ");
-#endif
 	n = read(socketfd, &answer, sizeof(answer));
+	if (n == 0)
+		errx(2, "Nothing received, maybe Monitor is down? Exiting.");
 	if (n != sizeof(answer))
 		err(1, "recvMonitorPkts(socketfd=%d,...): read(answer)",
 		    socketfd);
@@ -148,6 +147,9 @@ char recvMonitorPkts(int socketfd, config_t * newconfig)
 	n = read(socketfd, &newconfig->n, sizeof(newconfig->n));
 	if (n != sizeof(newconfig->n))
 		err(1, "recvMonitorPkts(socketfd=%d,...): read(n)", socketfd);
+#ifdef DEBUG
+	printf("Received new ");
+#endif
 	switch (answer) {
 	case 'C':
 #ifdef DEBUG
@@ -193,8 +195,8 @@ double calcDelay(struct timeval older)
 {
 	struct timeval now;
 	gettimeofday(&now, NULL);
-	return (double) (now.tv_sec - older.tv_sec) +
-		(double) (now.tv_usec - older.tv_usec) / 1000000.0;
+	return ((double) (now.tv_sec - older.tv_sec) +
+		(double) (now.tv_usec - older.tv_usec) / 1000000.0) * 1000;
 }
 
 uint32_t recvVoicePkts(int socketfd, packet_t * packet)
@@ -217,7 +219,7 @@ uint32_t recvVoicePkts(int socketfd, packet_t * packet)
 	       sizeof(packet->data));
 	packet->next = NULL;
 #ifdef DEBUG
-	printf("Received voice packet %u, delay = %f\n", packet->id, calcDelay(packet->time));	/* TODO: from who? */
+	printf("Received voice packet %u, delay = %f msec\n", packet->id, calcDelay(packet->time));	/* TODO: from who? */
 	fflush(stdout);
 #endif
 	return packet->id;
@@ -238,7 +240,7 @@ void sendVoicePkts(int socketfd, packet_t * packet)
 		    socketfd, sizeof(ppacket));
 	free(packet);
 #ifdef DEBUG
-	printf("Sending voice packet %u, delay = %f\n", packet->id,
+	printf("Sending voice packet %u, delay = %f msec\n", packet->id,
 	       calcDelay(packet->time));
 	fflush(stdout);
 #endif
@@ -283,10 +285,12 @@ uint32_t sendPktsToApp(int appSock, packet_t * peerPkt, packet_t * pktQueue,
 	if (peerPkt->id == expPktId) {
 		sendVoicePkts(appSock, peerPkt);
 		i = 1;
-		while ((first = getFirstInQ(&pktQueue)) != NULL
-		       && first->id == expPktId + i) {
-			sendVoicePkts(appSock, first);
-			i++;
+		if (pktQueue != NULL) {
+			while ((first = getFirstInQ(&pktQueue)) != NULL
+			       && first->id == expPktId + i) {
+				sendVoicePkts(appSock, first);
+				i++;
+			}
 		}
 		/*sendAckToPeer(); */
 	}
