@@ -14,10 +14,10 @@ int main(int argc, char *argv[])
 {
 	int retsel, maxfd;
 	char monAnswer;
-	uint32_t appPktId, peerPktId, expPktId = 0;
+	uint32_t appPktId, peerPktId, lastAcked, expPktId = 0;
 	int monitorSock, appSock, peerSock;
 	config_t oldcfg, newcfg, tmpcfg;
-	packet_t *appPkt, *peerPkt, *pktQueue = NULL;
+	packet_t *appPkt, *peerPkt, *recvQueue = NULL, *sendQueue = NULL;
 	fd_set infds, allsetinfds;
 
 	configSigHandlers();
@@ -44,10 +44,12 @@ int main(int argc, char *argv[])
 					recvMonitorPkts(monitorSock, &tmpcfg);
 				switch (monAnswer) {
 				case 'A':
-					manageMonAck();
+					manageMonAck(&tmpcfg, appPkt,
+						     sendQueue);
 					break;
 				case 'N':
-					manageMonNack();
+					manageMonNack(&tmpcfg, appPkt,
+						      &newcfg);
 					break;
 				case 'C':
 					oldcfg = newcfg;
@@ -68,7 +70,7 @@ int main(int argc, char *argv[])
 				peerPktId = recvVoicePkts(peerSock, peerPkt);
 				expPktId +=
 					sendPktsToApp(appSock, peerPkt,
-						      pktQueue, expPktId);
+						      recvQueue, expPktId);
 			}
 		}
 		else {

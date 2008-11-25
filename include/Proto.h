@@ -4,7 +4,7 @@
 #include "Common.h"
 
 int selectPath(config_t *);
-void manageMonAck();
-void manageMonNack();
+void manageMonAck(config_t *, packet_t *, packet_t *);
+void manageMonNack(config_t *, packet_t *, config_t *);
 
 #endif

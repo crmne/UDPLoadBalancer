@@ -238,7 +238,6 @@ void sendVoicePkts(int socketfd, packet_t * packet)
 	if (n != sizeof(ppacket))
 		err(1, "sendVoicePkts(socketfd=%d,...): write(packet)%lu",
 		    socketfd, sizeof(ppacket));
-	free(packet);
 #ifdef DEBUG
 	printf("Sending voice packet %u, delay = %f msec\n", packet->id,
 	       calcDelay(packet->time));
@@ -284,11 +283,13 @@ uint32_t sendPktsToApp(int appSock, packet_t * peerPkt, packet_t * pktQueue,
 	uint32_t i = 0;
 	if (peerPkt->id == expPktId) {
 		sendVoicePkts(appSock, peerPkt);
+		free(peerPkt);
 		i = 1;
 		if (pktQueue != NULL) {
 			while ((first = getFirstInQ(&pktQueue)) != NULL
 			       && first->id == expPktId + i) {
 				sendVoicePkts(appSock, first);
+				free(first);
 				i++;
 			}
 		}
