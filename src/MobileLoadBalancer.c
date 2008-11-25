@@ -14,10 +14,11 @@ int main(int argc, char *argv[])
 {
 	int retsel, maxfd;
 	char monAnswer;
-	uint32_t appPktId, peerPktId, lastAcked, expPktId = 0;
+	uint32_t i, appPktId, peerPktId, expPktId = 0;
 	int monitorSock, appSock, peerSock;
 	config_t oldcfg, newcfg, tmpcfg;
-	packet_t *appPkt, *peerPkt, *recvQueue = NULL, *sendQueue = NULL;
+	packet_t nackPkt, *appPkt, *peerPkt, *recvQueue = NULL, *sendQueue =
+		NULL;
 	fd_set infds, allsetinfds;
 
 	configSigHandlers();
@@ -61,6 +62,9 @@ int main(int argc, char *argv[])
 			if (FD_ISSET(appSock, &infds)) {
 				appPkt = (packet_t *)
 					malloc(sizeof(packet_t));
+				appPkt->numfail = nackPkt.numfail;
+				memcpy(&appPkt->failid, &nackPkt.failid,
+				       sizeof(nackPkt.failid));
 				appPktId = recvVoicePkts(appSock, appPkt);
 				sendVoicePkts(selectPath(&newcfg), appPkt);
 			}
@@ -71,6 +75,11 @@ int main(int argc, char *argv[])
 				expPktId +=
 					sendPktsToApp(appSock, peerPkt,
 						      recvQueue, expPktId);
+				nackPkt.numfail = peerPktId - expPktId;
+				for (i = expPktId; i < peerPktId; i++) {
+					nackPkt.failid[i - expPktId] = i;
+				}
+				warnx("expPktId=%u", expPktId);
 			}
 		}
 		else {

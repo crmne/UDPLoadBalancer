@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <err.h>
 #include <sys/select.h>
+#include <string.h>
 #include "Common.h"
 #include "Proto.h"
 #define APPPORT 11001
@@ -9,9 +10,9 @@
 int main(int argc, char *argv[])
 {
 	int retsel, maxfd;
-	uint32_t appAnswer, expPktId = 0;
+	uint32_t i, appAnswer, peerPktId, expPktId = 0;
 	int appSock, peerSock;
-	packet_t *appPkt, *peerPkt, *pktQueue = NULL;
+	packet_t nackPkt, *appPkt, *peerPkt, *pktQueue = NULL;
 	fd_set infds, allsetinfds;
 
 	configSigHandlers();
@@ -32,15 +33,22 @@ int main(int argc, char *argv[])
 			if (FD_ISSET(peerSock, &infds)) {
 				peerPkt =
 					(packet_t *) malloc(sizeof(packet_t));
-				recvVoicePkts(peerSock, peerPkt);
+				peerPktId = recvVoicePkts(peerSock, peerPkt);
 				expPktId +=
 					sendPktsToApp(appSock, peerPkt,
 						      pktQueue, expPktId);
+				nackPkt.numfail = peerPktId - expPktId;
+				for (i = expPktId; i < peerPktId; i++) {
+					nackPkt.failid[i - expPktId] = i;
+				}
 				warnx("expPktId=%u", expPktId);
 			}
 			if (FD_ISSET(appSock, &infds)) {
 				appPkt = (packet_t *)
 					malloc(sizeof(packet_t));
+				appPkt->numfail = nackPkt.numfail;
+				memcpy(&appPkt->failid, &nackPkt.failid,
+				       sizeof(nackPkt.failid));
 				appAnswer = recvVoicePkts(appSock, appPkt);
 				/* TODO: find best route */
 			}

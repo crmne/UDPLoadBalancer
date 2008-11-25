@@ -293,11 +293,9 @@ uint32_t sendPktsToApp(int appSock, packet_t * peerPkt, packet_t * pktQueue,
 				i++;
 			}
 		}
-		/*sendAckToPeer(); */
 	}
 	else {
 		insertInQ(&pktQueue, peerPkt);
-		/*sendNackToPeer(); */
 	}
 	return i;
 }

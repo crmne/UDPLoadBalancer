@@ -10,6 +10,7 @@
 #endif
 #define MAXCONNECTIONS 1
 #define MAXPATHS 3
+#define MAXFAIL 5
 #define PKTSIZE 100
 
 typedef struct
@@ -26,6 +27,8 @@ typedef struct
 	struct timeval time;
 	char data[PKTSIZE - sizeof(uint32_t) - sizeof(struct timeval)];
 	struct packet_t *next;
+	uint32_t numfail;
+	uint32_t failid[MAXFAIL];
 } packet_t;
 
 void configSigHandlers();
