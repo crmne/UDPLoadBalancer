@@ -1,7 +1,7 @@
-#ifndef __QUEUES_H__
-#define __QUEUES_H__
+#ifndef __QUEUE_H__
+#define __QUEUE_H__
 
-#include "Common.h"
+#include "packet.h"
 
 void insertInQ(packet_t **, packet_t *);
 packet_t *getFirstInQ(packet_t **);

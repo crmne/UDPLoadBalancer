@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <err.h>
 #include <sys/select.h>
-#include "Common.h"
+#include "packet.h"
+#include "conn.h"
+#include "comm.h"
+#include "packet.h"
 #define APPPORT 6001
 #define MONPORT 8000
 int main(int argc, char *argv[])
@@ -14,7 +17,6 @@ int main(int argc, char *argv[])
 	packet_t prova;
 	fd_set infds, allsetinfds;
 
-	configSigHandlers();
 
 	FD_ZERO(&allsetinfds);
 

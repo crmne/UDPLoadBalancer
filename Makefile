@@ -1,10 +1,10 @@
 INCLUDES=-Iinclude
 LDFLAGS=-lpthread -lm
 CFLAGS=${INCLUDES} -pipe -Wall -Wunused -pedantic -ggdb -DDEBUG
-SUBDIRS=test
-PROTOCOL=DumbProto
-CORE=src/Common.o src/Queues.o src/$(PROTOCOL).o
-EXECUTABLES=MobileLoadBalancer FixedLoadBalancer
+SUBDIRS=disttest
+PROTOCOL=dumb
+CORE=src/conn.o src/comm.o src/queue.o src/utils.o src/protocols/$(PROTOCOL).o
+EXECUTABLES=mlb flb
 UNITTESTS=initconn select queues memcpy
 .PHONY: clean cleanindent $(SUBDIRS)
 
@@ -19,9 +19,9 @@ $(SUBDIRS):
 
 %.c.o:
 
-MobileLoadBalancer: $(CORE) src/MobileLoadBalancer.o
+mlb: $(CORE) src/mlb.o
 	${CC} ${LDFLAGS} $^ -o $@
-FixedLoadBalancer: $(CORE) src/FixedLoadBalancer.o
+flb: $(CORE) src/flb.o
 	${CC} ${LDFLAGS} $^ -o $@
 
 initconn: $(CORE) utests/initconn.o
@@ -46,6 +46,6 @@ cleanindent:
 	-rm -f src/*.c~ include/*.h~ utests/*.c~
 clean:	cleanindent
 	-rm -f core* *.stackdump delaymobile.txt delayfixed.txt
-	-rm -f $(EXECUTABLES) src/*.o
+	-rm -f $(EXECUTABLES) src/*.o src/protocols/*.o
 	-rm -f $(UNITTESTS) utests/*.o
 	$(MAKE) -C $(SUBDIRS) clean

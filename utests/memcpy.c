@@ -1,4 +1,5 @@
-#include "Common.h"
+#include <stdio.h>
+#include "packet.h"
 int main(int argc, char *argv[])
 {
 	packet_t packet;

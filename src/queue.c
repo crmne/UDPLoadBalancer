@@ -1,5 +1,5 @@
 #include <err.h>
-#include "Common.h"
+#include "packet.h"
 void insertInQ(packet_t ** pktQueue, packet_t * packet)
 {
 	packet_t *current, *prev;

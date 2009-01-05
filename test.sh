@@ -1,7 +1,14 @@
 #!/bin/bash
+# ------------------------
 # Insert your favourites terminal emulators here, in order (the first one found # in the system is used)
 TERMINALS=( urxvt xterm )
+# Programs to run, in order
+PROGRAMS="disttest/Monitor.exe ./mlb ./flb disttest/Appfixed.exe disttest/Appmobile.exe"
+# Delay in seconds between the execution of each program
+DELAY=2
+# ------------------------
 # Do not change anything below this line if you don't know what you're doing!
+# ------------------------
 if [ "`uname`" == "Darwin" ]; then
 function newin() {
    CWD=`/bin/pwd`
@@ -26,12 +33,24 @@ function newin() {
 	$TERMINAL -e $@ &
 }
 fi
-newin test/Monitor.exe
-sleep 2
-newin ./MobileLoadBalancer
-sleep 1
-newin ./FixedLoadBalancer
-sleep 2
-newin test/Appfixed.exe
-sleep 1
-newin test/Appmobile.exe
+
+for prog in $PROGRAMS; do
+		echo Starting $prog ...
+		newin $prog
+		sleep $DELAY
+done
+
+#newin screen test/Monitor.exe
+#sleep 5
+#screen -X split
+#screen -X split
+#screen -X split
+#screen -X split
+#screen -X focus
+#screen -X screen ./MobileLoadBalancer
+#screen -X focus
+#screen -X screen ./FixedLoadBalancer
+#screen -X focus
+#screen -X screen test/Appfixed.exe
+#screen -X focus
+#screen -X screen test/Appmobile.exe

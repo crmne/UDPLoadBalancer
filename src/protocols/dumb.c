@@ -1,8 +1,9 @@
 #include <err.h>
 #include <stdlib.h>
-#include "Common.h"
-#include "Queues.h"
-#include "Proto.h"
+#include "packet.h"
+#include "queue.h"
+#include "comm.h"
+#include "protocol.h"
 
 int selectPath(config_t * config)
 {

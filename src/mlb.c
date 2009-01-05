@@ -3,12 +3,37 @@
 #include <err.h>
 #include <sys/select.h>
 #include <string.h>
-#include "Common.h"
-#include "Proto.h"
+#include <netinet/in.h>
+#include <unistd.h>
+
+#include "packet.h"
+#include "conn.h"
+#include "comm.h"
+#include "protocol.h"
+#include "utils.h"
 
 #define APPPORT 6001
 #define PEERPORT 7001
 #define MONPORT 8000
+
+void reconfigRoutes(config_t * oldcfg, config_t * newcfg)
+{
+	struct sockaddr_in addr_in;
+	int i;
+	for (i = 0; i < oldcfg->n; i++) {
+		close(oldcfg->socket[i]);
+	}
+	for (i = 0; i < newcfg->n; i++) {
+		newcfg->socket[i] = createSocket4(SOCK_DGRAM);
+		addr_in = setSocket4("127.0.0.1", newcfg->port[i]);
+		if (connect
+		    (newcfg->socket[i], (struct sockaddr *) &addr_in,
+		     sizeof(addr_in)) < 0)
+			err(1,
+			    "reconfigRoutes(...): connect(port=%d,socketfd=%d)",
+			    newcfg->port[i], newcfg->socket[i]);
+	}
+}
 
 int main(int argc, char *argv[])
 {
@@ -21,7 +46,6 @@ int main(int argc, char *argv[])
 		NULL;
 	fd_set infds, allsetinfds;
 
-	configSigHandlers();
 	memset(&newcfg, 0, sizeof(newcfg));
 	FD_ZERO(&allsetinfds);
 

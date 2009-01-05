@@ -1,7 +1,7 @@
-#ifndef __PROTO_H__
-#define __PROTO_H__
+#ifndef __PROTOCOL_H__
+#define __PROTOCOL_H__
 
-#include "Common.h"
+#include "packet.h"
 
 int selectPath(config_t *);
 void manageMonAck(config_t *, packet_t *, packet_t *);

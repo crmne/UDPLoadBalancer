@@ -3,10 +3,16 @@
 #include <err.h>
 #include <sys/select.h>
 #include <string.h>
-#include "Common.h"
-#include "Proto.h"
+
+#include "packet.h"
+#include "conn.h"
+#include "comm.h"
+#include "protocol.h"
+#include "utils.h"
+
 #define APPPORT 11001
 #define PEERPORT 10001
+
 int main(int argc, char *argv[])
 {
 	int retsel, maxfd;
@@ -15,7 +21,6 @@ int main(int argc, char *argv[])
 	packet_t nackPkt, *appPkt, *peerPkt, *pktQueue = NULL;
 	fd_set infds, allsetinfds;
 
-	configSigHandlers();
 	FD_ZERO(&allsetinfds);
 
 	appSock = acceptFromApp(listenFromApp(APPPORT));

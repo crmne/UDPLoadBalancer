@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
-#include "Common.h"
-#include "Queues.h"
+#include "packet.h"
+#include "queue.h"
 void printQueue(packet_t * queue)
 {
 	fprintf(stderr, "printQueue(): ");
