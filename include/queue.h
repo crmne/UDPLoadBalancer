@@ -5,5 +5,5 @@
 
 void insertInQ(packet_t **, packet_t *);
 packet_t *getFirstInQ(packet_t **);
-
+packet_t *removeFromQ(packet_t **, uint32_t);
 #endif

@@ -55,3 +55,22 @@ packet_t *getFirstInQ(packet_t ** pktQueue)
 	}
 	return first;
 }
+
+packet_t *removeFromQ(packet_t ** pktQueue, uint32_t id)
+{
+	packet_t *current = NULL, *prev;
+	if (*pktQueue != NULL) {
+		current = *pktQueue;
+		prev = NULL;
+		if (id == current->id)
+			return getFirstInQ(pktQueue);
+		while (current != NULL && id != current->id) {
+			prev = current;
+			current = (packet_t *) current->next;
+		}
+		if (current != NULL) {
+			prev->next = current->next;
+		}
+	}
+	return current;
+}

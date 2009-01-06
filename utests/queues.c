@@ -4,11 +4,11 @@
 #include "queue.h"
 void printQueue(packet_t * queue)
 {
-	fprintf(stderr, "printQueue(): ");
 	packet_t *current = queue;
+	fprintf(stderr, "printQueue(): ");
 	while (current != NULL) {
 		printf("%d ", current->id);
-		current = current->next;
+		current = (packet_t *) current->next;
 	}
 	printf("NULL\n");
 }
@@ -28,6 +28,7 @@ int main(int argc, char *argv[])
 
 	printQueue(Queue);
 
+	fprintf(stderr, "Testing insertions...\n");
 	insertInQ(&Queue, &four);
 	printQueue(Queue);
 	insertInQ(&Queue, &two);
@@ -41,11 +42,36 @@ int main(int argc, char *argv[])
 	insertInQ(&Queue, &seven);
 	printQueue(Queue);
 
-	fprintf(stderr, "Now testing removes\n");
+	fprintf(stderr, "Testing removes of first element...\n");
 	for (i = 0; i < 10; i++) {
 		getFirstInQ(&Queue);
 		printQueue(Queue);
 	}
+
+	fprintf(stderr, "Repopulating queue...\n");
+	insertInQ(&Queue, &four);
+	insertInQ(&Queue, &two);
+	insertInQ(&Queue, &three);
+	insertInQ(&Queue, &eight);
+	insertInQ(&Queue, &one);
+	insertInQ(&Queue, &seven);
+	printQueue(Queue);
+
+	fprintf(stderr, "Testing general removes...\n");
+	removeFromQ(&Queue, four.id);
+	printQueue(Queue);
+	removeFromQ(&Queue, two.id);
+	printQueue(Queue);
+	removeFromQ(&Queue, three.id);
+	printQueue(Queue);
+	removeFromQ(&Queue, five.id);
+	printQueue(Queue);
+	removeFromQ(&Queue, eight.id);
+	printQueue(Queue);
+	removeFromQ(&Queue, one.id);
+	printQueue(Queue);
+	removeFromQ(&Queue, seven.id);
+	printQueue(Queue);
 
 	return 0;
 }

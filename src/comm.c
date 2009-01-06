@@ -141,4 +141,3 @@ char recvMonitorPkts(int socketfd, config_t * newconfig)
 #endif
 	return answer;
 }
-
