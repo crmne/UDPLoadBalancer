@@ -14,19 +14,17 @@ void manageMonAck(config_t * ack, packet_t * lastSent, packet_t * sendQueue)
 {
 	if (lastSent->id == ack->n) {
 		free(lastSent);
-	}
-	else {
-		errx("ACK %u, LASTSENT %u", ack->n, lastSent->id);
-		/*insertInQ(&sendQueue, lastSent); */
+	} else {
+		warnx("ACK %u, LASTSENT %u", ack->n, lastSent->id);
+		/*insertInQ(&sendQueue, lastSent); ?? */
 	}
 }
 
 void manageMonNack(config_t * nack, packet_t * lastSent, config_t * config)
 {
-	if (lastSent->id != nack->n)
-		errx(255, "CAZZO!");
-	else {
+	if (lastSent->id == nack->n) {
 		sendVoicePkts(selectPath(config), lastSent);
-		/*free(lastSent); */
+	} else {
+		warnx("NACK %u, LASTSENT %u", nack->n, lastSent->id);
 	}
 }
