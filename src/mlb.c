@@ -16,11 +16,12 @@
 #define PEERPORT 7001
 #define MONPORT 8000
 
-void reconfigRoutes(config_t * oldcfg, config_t * newcfg)
+void reconfigRoutes(config_t * oldcfg, config_t * newcfg, fd_set * fdset)
 {
 	struct sockaddr_in addr_in;
 	int i;
 	for (i = 0; i < oldcfg->n; i++) {
+		FD_CLR(oldcfg->socket[i], fdset);
 		close(oldcfg->socket[i]);
 	}
 	for (i = 0; i < newcfg->n; i++) {
@@ -32,6 +33,8 @@ void reconfigRoutes(config_t * oldcfg, config_t * newcfg)
 			err(1,
 			    "reconfigRoutes(...): connect(port=%d,socketfd=%d)",
 			    newcfg->port[i], newcfg->socket[i]);
+		else
+			FD_SET(newcfg->socket[i], fdset);
 	}
 }
 
@@ -44,16 +47,18 @@ int main(int argc, char *argv[])
 	config_t oldcfg, newcfg, tmpcfg;
 	packet_t nackPkt, *appPkt, *peerPkt, *recvQueue = NULL, *sendQueue =
 		NULL;
-	fd_set infds, allsetinfds;
+	fd_set infds, allsetinfds, outfds, allsetoutfds;
 
 	memset(&newcfg, 0, sizeof(newcfg));
 	FD_ZERO(&allsetinfds);
+	FD_ZERO(&allsetoutfds);
 
 	monitorSock = connectToMon(MONPORT);
 	FD_SET(monitorSock, &allsetinfds);
 
 	appSock = acceptFromApp(listenFromApp(APPPORT));
 	FD_SET(appSock, &allsetinfds);
+	FD_SET(appSock, &allsetoutfds);
 
 	peerSock = listenUDP4(PEERPORT);
 	FD_SET(peerSock, &allsetinfds);
@@ -62,7 +67,8 @@ int main(int argc, char *argv[])
 
 	while (1) {
 		infds = allsetinfds;
-		retsel = select(maxfd + 1, &infds, NULL, NULL, NULL);
+		outfds = allsetoutfds;
+		retsel = select(maxfd + 1, &infds, &outfds, NULL, NULL);
 		if (retsel > 0) {
 			if (FD_ISSET(monitorSock, &infds)) {
 				monAnswer =
@@ -79,7 +85,8 @@ int main(int argc, char *argv[])
 				case 'C':
 					oldcfg = newcfg;
 					newcfg = tmpcfg;
-					reconfigRoutes(&oldcfg, &newcfg);
+					reconfigRoutes(&oldcfg, &newcfg,
+						       &allsetoutfds);
 					break;
 				}
 			}
@@ -96,10 +103,17 @@ int main(int argc, char *argv[])
 				peerPkt =
 					(packet_t *) malloc(sizeof(packet_t));
 				peerPktId = recvVoicePkts(peerSock, peerPkt);
-				expPktId +=
-					sendPktsToApp(appSock, peerPkt,
-						      recvQueue, expPktId);
-				nackPkt.numfail = peerPktId - expPktId;
+				if (FD_ISSET(appSock, &outfds)) {
+					expPktId +=
+						sendPktsToApp(appSock,
+							      peerPkt,
+							      recvQueue,
+							      expPktId);
+					nackPkt.numfail =
+						peerPktId - expPktId;
+				}
+				else
+					err(132, "App socket not ready!");
 				for (i = expPktId; i < peerPktId; i++) {
 					nackPkt.failid[i - expPktId] = i;
 				}

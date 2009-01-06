@@ -19,12 +19,15 @@ int main(int argc, char *argv[])
 	uint32_t i, appAnswer, peerPktId, expPktId = 0;
 	int appSock, peerSock;
 	packet_t nackPkt, *appPkt, *peerPkt, *pktQueue = NULL;
-	fd_set infds, allsetinfds;
+	fd_set infds, allsetinfds, outfds, allsetoutfds;
 
 	FD_ZERO(&allsetinfds);
+	FD_ZERO(&allsetoutfds);
 
 	appSock = acceptFromApp(listenFromApp(APPPORT));
 	FD_SET(appSock, &allsetinfds);
+	FD_SET(appSock, &allsetoutfds);
+
 
 	peerSock = listenUDP4(PEERPORT);
 	FD_SET(peerSock, &allsetinfds);
@@ -32,17 +35,25 @@ int main(int argc, char *argv[])
 	maxfd = peerSock;
 
 	while (1) {
+		outfds = allsetoutfds;
 		infds = allsetinfds;
-		retsel = select(maxfd + 1, &infds, NULL, NULL, NULL);
+		retsel = select(maxfd + 1, &infds, &outfds, NULL, NULL);
 		if (retsel > 0) {
 			if (FD_ISSET(peerSock, &infds)) {
 				peerPkt =
 					(packet_t *) malloc(sizeof(packet_t));
 				peerPktId = recvVoicePkts(peerSock, peerPkt);
-				expPktId +=
-					sendPktsToApp(appSock, peerPkt,
-						      pktQueue, expPktId);
-				nackPkt.numfail = peerPktId - expPktId;
+				if (FD_ISSET(appSock, &outfds)) {
+					expPktId +=
+						sendPktsToApp(appSock,
+							      peerPkt,
+							      pktQueue,
+							      expPktId);
+					nackPkt.numfail =
+						peerPktId - expPktId;
+				}
+				else
+					err(132, "App Socket not ready!");
 				for (i = expPktId; i < peerPktId; i++) {
 					nackPkt.failid[i - expPktId] = i;
 				}
