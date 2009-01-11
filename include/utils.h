@@ -9,7 +9,6 @@
 #endif
 #define MAXCONNECTIONS 1
 #define MAXPATHS 3
-#define MAXFAIL 5
 #define PKTSIZE 100
 
 double calcDelay(struct timeval);

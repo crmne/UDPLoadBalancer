@@ -1,8 +1,9 @@
-INCLUDES=-Iinclude
-LDFLAGS=-lpthread -lm
-CFLAGS=${INCLUDES} -pipe -Wall -Wunused -pedantic -ggdb -DDEBUG
-SUBDIRS=disttest
 PROTOCOL=dumb
+INCLUDES=-Iinclude -Iinclude/protocols
+LDFLAGS=-lpthread -lm
+DEFINES=-DPROTO_H=\"${PROTOCOL}.h\" -DDEBUG
+CFLAGS=${INCLUDES} -pipe -Wall -Wunused -pedantic -ggdb ${DEFINES}
+SUBDIRS=disttest
 CORE=src/conn.o src/comm.o src/queue.o src/utils.o src/protocols/$(PROTOCOL).o
 EXECUTABLES=mlb flb
 UNITTESTS=initconn select queues memcpy
@@ -41,7 +42,7 @@ memcpy: $(CORE) utests/memcpy.o
 
 #GNU indent only
 indent:
-	indent src/*.c include/*.h utests/*.c -i8 -bli0 -br -npsl -npcs
+	indent src/*.c src/protocols/*.c include/*.h include/protocols/*.h utests/*.c -i8 -bli0 -br -npsl -npcs
 cleanindent:
 	-rm -f src/*.c~ include/*.h~ utests/*.c~
 clean:	cleanindent

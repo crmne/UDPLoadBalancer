@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "utils.h"
+#include PROTO_H
 
 typedef struct
 {
@@ -18,8 +19,7 @@ typedef struct
 	struct timeval time;
 	char data[PKTSIZE - sizeof(uint32_t) - sizeof(struct timeval)];
 	struct packet_t *next;
-	uint32_t numfail;
-	uint32_t failid[MAXFAIL];
+	struct packet_additions_t pa;
 } packet_t;
 
 #endif

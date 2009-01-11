@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "packet.h"
+#include "protocol.h"
 #include "queue.h"
 #include "utils.h"
 
@@ -26,6 +27,9 @@ uint32_t recvVoicePkts(int socketfd, packet_t * packet)
 	memcpy(&packet->data,
 	       (char *) &ppacket + sizeof(packet->id) + sizeof(packet->time),
 	       sizeof(packet->data));
+	pa_cpy_from_pp(&packet->pa,
+		       (char *) &ppacket + sizeof(packet->id) +
+		       sizeof(packet->time) + sizeof(packet->data));
 	packet->next = NULL;
 #ifdef DEBUG
 	printf("Received voice packet %u, delay = %f msec\n", packet->id, calcDelay(packet->time));	/* TODO: from who? */
@@ -43,6 +47,9 @@ void sendVoicePkts(int socketfd, packet_t * packet)
 	       sizeof(packet->time));
 	memcpy((char *) &ppacket + sizeof(packet->id) + sizeof(packet->time),
 	       &packet->data, sizeof(packet->data));
+	pa_cpy_to_pp((char *) &ppacket + sizeof(packet->id) +
+		     sizeof(packet->time) + sizeof(packet->data),
+		     &packet->pa);
 	n = write(socketfd, &ppacket, sizeof(ppacket));
 	if (n != sizeof(ppacket))
 		err(1, "sendVoicePkts(socketfd=%d,...): write(packet)%lu",

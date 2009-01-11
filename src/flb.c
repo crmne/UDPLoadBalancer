@@ -49,22 +49,22 @@ int main(int argc, char *argv[])
 							      peerPkt,
 							      pktQueue,
 							      expPktId);
-					nackPkt.numfail =
+					nackPkt.pa.numfail =
 						peerPktId - expPktId;
 				}
 				else
 					err(132, "App Socket not ready!");
 				for (i = expPktId; i < peerPktId; i++) {
-					nackPkt.failid[i - expPktId] = i;
+					nackPkt.pa.failid[i - expPktId] = i;
 				}
 				warnx("expPktId=%u", expPktId);
 			}
 			if (FD_ISSET(appSock, &infds)) {
 				appPkt = (packet_t *)
 					malloc(sizeof(packet_t));
-				appPkt->numfail = nackPkt.numfail;
-				memcpy(&appPkt->failid, &nackPkt.failid,
-				       sizeof(nackPkt.failid));
+				appPkt->pa.numfail = nackPkt.pa.numfail;
+				memcpy(&appPkt->pa.failid, &nackPkt.pa.failid,
+				       sizeof(nackPkt.pa.failid));
 				appAnswer = recvVoicePkts(appSock, appPkt);
 				/* TODO: find best route */
 			}
