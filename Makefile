@@ -41,9 +41,9 @@ memcpy: $(CORE) utests/memcpy.o
 
 #GNU indent only
 indent:
-	indent src/*.c include/*.h utests/*.c -i8 -bli0 -br -npsl -npcs
+	@if [ "`indent --version 2> /dev/null | cut -d' ' -f1 `" == "GNU" ]; then indent src/*.c include/*.h utests/*.c -i8 -bli0 -br -npsl -npcs; else echo "Sorry, GNU indent required!"; fi
 cleanindent:
-	-rm -f src/*.c~ include/*.h~ utests/*.c~
+	-rm -f src/*.c~ src/protocols/*.c~ include/*.h~ utests/*.c~
 clean:	cleanindent
 	-rm -f core* *.stackdump delaymobile.txt delayfixed.txt
 	-rm -f $(EXECUTABLES) src/*.o src/protocols/*.o
