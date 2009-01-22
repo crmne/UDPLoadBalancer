@@ -3,126 +3,144 @@
 #include <err.h>
 #include <sys/select.h>
 #include <string.h>
-#include <netinet/in.h>
 #include <unistd.h>
 
-#include "packet.h"
-#include "conn.h"
-#include "comm.h"
-#include "protocol.h"
-#include "utils.h"
+#include "macro.h"
 
-#define APPPORT 6001
-#define PEERPORT 7001
-#define MONPORT 8000
+#define APP_PORT 6001
+#define PEER_PORT 7001
+#define MON_PORT 8000
+#define FIRST_PACKET_ID 9999
 
-void reconfigRoutes(config_t * oldcfg, config_t * newcfg, fd_set * fdset)
+void reconfigRoutes(config_t * oldcfg, config_t * newcfg)
 {
-	struct sockaddr_in addr_in;
-	int i;
-	for (i = 0; i < oldcfg->n; i++) {
-		FD_CLR(oldcfg->socket[i], fdset);
-		close(oldcfg->socket[i]);
-	}
-	for (i = 0; i < newcfg->n; i++) {
-		newcfg->socket[i] = createSocket4(SOCK_DGRAM);
-		addr_in = setSocket4("127.0.0.1", newcfg->port[i]);
-		if (connect
-		    (newcfg->socket[i], (struct sockaddr *) &addr_in,
-		     sizeof(addr_in)) < 0)
-			err(1,
-			    "reconfigRoutes(...): connect(port=%d,socketfd=%d)",
-			    newcfg->port[i], newcfg->socket[i]);
-		else
-			FD_SET(newcfg->socket[i], fdset);
-	}
+    int i;
+
+    for (i = 0; i < oldcfg->n; i++) {
+	close(oldcfg->socket[i]);
+    }
+    for (i = 0; i < newcfg->n; i++) {
+	newcfg->socket[i] = connectUDP4("127.0.0.1", newcfg->port[i]);
+    }
 }
 
 int main(int argc, char *argv[])
 {
-	int retsel, maxfd;
-	char monAnswer;
-	uint32_t i, appPktId, peerPktId, expPktId = 0;
-	int monitorSock, appSock, peerSock;
-	config_t oldcfg, newcfg, tmpcfg;
-	packet_t nackPkt, *appPkt, *peerPkt, *recvQueue = NULL, *sendQueue =
-		NULL;
-	fd_set infds, allsetinfds, outfds, allsetoutfds;
+    int socks, maxfd;
+    char monAnswer;
+    uint32_t appPktId, peerPktId, expired_pkt_id, expPktId =
+	FIRST_PACKET_ID;
+    int monitorSock, appSock, peerSock, pathSock;
+    config_t oldcfg, newcfg, tmpcfg;
+    struct timeval *timeout = NULL, tick;
+    packet_t *appPkt = NULL, *peerPkt = NULL, *recvQueue =
+	NULL, *sendQueue = NULL;
+    fd_set infds, allsetinfds;
 
-	memset(&newcfg, 0, sizeof(newcfg));
-	FD_ZERO(&allsetinfds);
-	FD_ZERO(&allsetoutfds);
+    expired_pkt_id = expPktId - 1;
 
-	monitorSock = connectToMon(MONPORT);
-	FD_SET(monitorSock, &allsetinfds);
+    timeval_store(&tick, PACKET_RATE);
 
-	appSock = acceptFromApp(listenFromApp(APPPORT));
-	FD_SET(appSock, &allsetinfds);
-	FD_SET(appSock, &allsetoutfds);
+    memset(&newcfg, 0, sizeof(newcfg));
+    FD_ZERO(&allsetinfds);
 
-	peerSock = listenUDP4(PEERPORT);
-	FD_SET(peerSock, &allsetinfds);
+    monitorSock = connectToMon("127.0.0.1", MON_PORT);
+    FD_SET(monitorSock, &allsetinfds);
 
-	maxfd = peerSock;
+    appSock = acceptFromApp(listenFromApp("127.0.0.1", APP_PORT));
+    FD_SET(appSock, &allsetinfds);
 
-	while (1) {
-		infds = allsetinfds;
-		outfds = allsetoutfds;
-		retsel = select(maxfd + 1, &infds, &outfds, NULL, NULL);
-		if (retsel > 0) {
-			if (FD_ISSET(monitorSock, &infds)) {
-				monAnswer =
-					recvMonitorPkts(monitorSock, &tmpcfg);
-				switch (monAnswer) {
-				case 'A':
-					manageMonAck(&tmpcfg, appPkt,
-						     sendQueue);
-					break;
-				case 'N':
-					manageMonNack(&tmpcfg, appPkt,
-						      &newcfg);
-					break;
-				case 'C':
-					oldcfg = newcfg;
-					newcfg = tmpcfg;
-					reconfigRoutes(&oldcfg, &newcfg,
-						       &allsetoutfds);
-					break;
-				}
-			}
-			if (FD_ISSET(appSock, &infds)) {
-				appPkt = (packet_t *)
-					malloc(sizeof(packet_t));
-				appPkt->pa.numfail = nackPkt.pa.numfail;
-				memcpy(&appPkt->pa.failid, &nackPkt.pa.failid,
-				       sizeof(nackPkt.pa.failid));
-				appPktId = recvVoicePkts(appSock, appPkt);
-				sendVoicePkts(selectPath(&newcfg), appPkt);
-			}
-			if (FD_ISSET(peerSock, &infds)) {
-				peerPkt =
-					(packet_t *) malloc(sizeof(packet_t));
-				peerPktId = recvVoicePkts(peerSock, peerPkt);
-				if (FD_ISSET(appSock, &outfds)) {
-					expPktId +=
-						sendPktsToApp(appSock,
-							      peerPkt,
-							      recvQueue,
-							      expPktId);
-					nackPkt.pa.numfail =
-						peerPktId - expPktId;
-				}
-				else
-					err(132, "App socket not ready!");
-				for (i = expPktId; i < peerPktId; i++) {
-					nackPkt.pa.failid[i - expPktId] = i;
-				}
-				warnx("expPktId=%u", expPktId);
-			}
+    peerSock = listenUDP4("127.0.0.1", PEER_PORT);
+    FD_SET(peerSock, &allsetinfds);
+
+    maxfd = peerSock;
+
+    while (1) {
+	infds = allsetinfds;
+	socks = select(maxfd + 1, &infds, NULL, NULL, timeout);
+	if (socks == 0) {
+	    if (timeval_cmp(&tick, timeout) != 0)
+		memcpy(timeout, &tick, sizeof(tick));
+
+	    expired_pkt_id++;
+
+	    if (expPktId <= expired_pkt_id)
+		expPktId = expired_pkt_id + 1;
+#ifdef DEBUG
+	    warnx("Tick: Packet %u has expired.. expected is now %u",
+		  expired_pkt_id, expPktId);
+#endif
+
+	} else if (socks > 0) {
+	    if (FD_ISSET(monitorSock, &infds)) {
+		monAnswer = recvMonitorPkts(monitorSock, &tmpcfg);
+		switch (monAnswer) {
+		case 'A':
+		    manageMonAck(&tmpcfg, appPkt, sendQueue);
+		    break;
+		case 'N':
+		    manageMonNack(&tmpcfg, appPkt, &newcfg);
+		    break;
+		case 'C':
+		    oldcfg = newcfg;
+		    newcfg = tmpcfg;
+		    reconfigRoutes(&oldcfg, &newcfg);
+		    break;
+		default:
+		    errx(1, "Monitor packet not understood!");
 		}
-		else {
-			err(1, "select()");
+	    }
+	    if (FD_ISSET(appSock, &infds)) {
+		appPkt = (packet_t *) malloc(sizeof(packet_t));
+		appPktId = recvVoicePkts(appSock, appPkt);
+		pathSock = selectPath(&newcfg);
+		if (appPkt->id > 5)
+		    sendVoicePkts(pathSock, appPkt);
+	    }
+	    if (FD_ISSET(peerSock, &infds)) {
+		peerPkt = (packet_t *) malloc(sizeof(packet_t));
+		peerPktId = recvVoicePkts(peerSock, peerPkt);
+		if (timeout == NULL) {
+		    /* calcolare l'inizio della chiamata */
+		    uint32_t delay = timeval_age(&peerPkt->time);
+
+		    delay += (peerPktId - FIRST_PACKET_ID) * PACKET_RATE;
+		    expPktId = peerPktId;
+		    warnx("Call started %u usecs ago!", delay);
+		    /* calcolare il tempo che manca per far scadere il
+		       primo pacchetto */
+		    timeout =
+			(struct timeval *) malloc(sizeof(struct timeval));
+		    if (delay < MAX_TIME) {
+			delay = MAX_TIME - delay;
+		    } else {
+			delay -= MAX_TIME;
+			expired_pkt_id =
+			    FIRST_PACKET_ID + (delay / PACKET_RATE);
+			delay = PACKET_RATE - (delay % PACKET_RATE);
+
+		    }
+		    timeval_store(timeout, delay);
+#ifdef DEBUG
+		    warnx
+			("Next timeout is due in %u usecs! Expired packet is %u",
+			 delay, expired_pkt_id);
+#endif
+
 		}
+/*		if (timeval_age(&peerPkt->time) < MAX_DELAY)*/
+		sendPktsToApp(appSock, peerPkt, &recvQueue, &expPktId);
+/*		else {
+		    warnx("Packet %u is too late! Rejecting..", peerPktId);
+		    free(peerPkt);
+		}*/
+#ifdef DEBUG
+		warnx("expPktId=%d", expPktId);
+#endif
+	    }
+	} else {
+	    err(1, "select()");
 	}
-	return 127;		/* we mustn't reach this point! */
+    }
+    return 127;			/* we mustn't reach this point! */
 }

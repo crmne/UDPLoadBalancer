@@ -5,9 +5,10 @@
 
 int createSocket4(int);
 struct sockaddr_in setSocket4(const char *, int);
-int listenFromApp(int);
+int listenFromApp(const char *, int);
 int acceptFromApp(int);
-int connectToMon(int);
-int listenUDP4(int);
+int connectToMon(const char *, int);
+int listenUDP4(const char *, int);
+int connectUDP4(const char *, int);
 
 #endif
