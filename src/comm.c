@@ -81,8 +81,8 @@ void sendVoicePkts(int socketfd, packet_t * packet)
 		 sizeof(packet->time) + sizeof(packet->data), &packet->pa);*/
     n = write(socketfd, &ppacket, sizeof(ppacket));
     if (n != sizeof(ppacket))
-	err(1, "sendVoicePkts(socketfd=%d,...): write(packet)%u",
-	    socketfd, sizeof(ppacket));
+	err(1, "sendVoicePkts(socketfd=%d,...): write(packet)%u", socketfd,
+	    sizeof(ppacket));
 #ifdef DEBUG
     printf("Sending voice packet %u, delay = %u usec\n", packet->id,
 	   timeval_age(&packet->time));

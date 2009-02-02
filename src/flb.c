@@ -1,150 +1,72 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <string.h>		/* memset */
 #include <err.h>
-#include <sys/select.h>
-#include <string.h>
-
+#include <stdlib.h>		/* malloc */
 #include "macro.h"
 
+#define NFDS 3
+#define NPKTS 2
+#define HOST "127.0.0.1"
 #define APP_PORT 11001
 #define PEER_PORT 10001
 #define PATH_PORT 9001
 #define FIRST_PACKET_ID 0
 
-uint32_t last_expired_packet(struct timeval * conv_start,
-			     const uint32_t first)
-{
-    uint32_t delay = timeval_age(conv_start);
-    uint32_t unsigned_max = -MAX_DELAY / PACKET_RATE;
-    uint32_t packet_id = first + ((delay - MAX_DELAY) / PACKET_RATE);
-
-    if (packet_id >= unsigned_max)
-	return 0;
-    else
-	return packet_id;
-}
-
-struct timeval *call_start_time(struct timeval *conv_start,
-				const struct timeval *packet_time,
-				const uint32_t packet_id,
-				const uint32_t first)
-{
-    uint32_t added_delay = (packet_id - first) * PACKET_RATE;
-    memcpy(conv_start, packet_time, sizeof(struct timeval));
-    return timeval_sub(conv_start, added_delay);
-}
-
-struct timeval *next_timeout(struct timeval *conv_start,
-			     struct timeval *timeout)
-{
-    uint32_t age = timeval_age(conv_start);
-
-    if (age < MAX_TIME) {
-	age = MAX_TIME - age;
-    } else {
-	age -= MAX_TIME;
-	age = PACKET_RATE - (age % PACKET_RATE);
-    }
-
-
-    return timeval_store(timeout, age);
-}
+#define ERR_SELECT 1, "select()"
+#define ERR_MONPACK 2, "Monitor packet not understood"
+#define ERR_NOFDSET 3, "Incoming data, but in no controlled fd. Strange"
+typedef enum types { app, peer, path } types;
 int main(int argc, char *argv[])
 {
-    int socks, maxfd;
-    uint32_t appAnswer, peerPktId, expired_pkt_id, expPktId =
-	FIRST_PACKET_ID;
-    int appSock, peerSock, pathSock;
-    struct timeval *timeout = NULL, tick, conv_start;
-    packet_t *appPkt = NULL, *peerPkt = NULL, *recvQueue = NULL;
+    int i, socks, maxfd, fd[NFDS];
+    uint32_t expected_pkt;
+    packet_t *pkt[NPKTS], *recvq;
     fd_set infds, allsetinfds;
 
-    expired_pkt_id = expPktId - 1;
+    expected_pkt = FIRST_PACKET_ID;
 
-    timeval_store(&tick, PACKET_RATE);
+    recvq = NULL;
+
+    for (i = 0; i < NPKTS; i++)
+	pkt[i] = NULL;
 
     FD_ZERO(&allsetinfds);
 
-    appSock = acceptFromApp(listenFromApp("127.0.0.1", APP_PORT));
-    FD_SET(appSock, &allsetinfds);
+    fd[app] = acceptFromApp(listenFromApp(HOST, APP_PORT));
+    FD_SET(fd[app], &allsetinfds);
 
+    fd[peer] = listenUDP4(HOST, PEER_PORT);
+    FD_SET(fd[peer], &allsetinfds);
 
-    peerSock = listenUDP4("127.0.0.1", PEER_PORT);
-    FD_SET(peerSock, &allsetinfds);
+    fd[path] = connectUDP4(HOST, PATH_PORT);
 
-    pathSock = connectUDP4("127.0.0.1", PATH_PORT);
+    maxfd = fd[peer];
 
-    maxfd = peerSock;
-
-    while (1) {
+    for (;;) {
 	infds = allsetinfds;
-	socks = select(maxfd + 1, &infds, NULL, NULL, timeout);
-	if (timeout != NULL) {
+	socks = select(maxfd + 1, &infds, NULL, NULL, NULL);
+	if (socks <= 0)
+	    err(ERR_SELECT);
+	while (socks > 0) {
+	    if (FD_ISSET(fd[peer], &infds)) {
+		uint32_t pktid;
 
-
-	    expired_pkt_id =
-		last_expired_packet(&conv_start, FIRST_PACKET_ID);
-
-	    if (recvQueue != NULL && recvQueue->id == expired_pkt_id) {
-		packet_t *exppkt = getFirstInQ(&recvQueue);
-
-		sendVoicePkts(appSock, exppkt);
-		free(exppkt);
-	    }
-	    if (expPktId <= expired_pkt_id)
-		expPktId = expired_pkt_id + 1;
-
-	    next_timeout(&conv_start, timeout);
-#ifdef DEBUG
-	    warnx
-		("Next timeout in %u usecs! Expired packet is %u, Call time %u",
-		 timeval_load(timeout), expired_pkt_id,
-		 timeval_age(&conv_start));
-#endif
-	}
-	if (socks > 0) {
-	    if (FD_ISSET(peerSock, &infds)) {
-		peerPkt = (packet_t *) malloc(sizeof(packet_t));
-		peerPktId = recvVoicePkts(peerSock, peerPkt);
-		if (timeout == NULL) {
-		    uint32_t delay =
-			timeval_age(call_start_time
-				    (&conv_start, &peerPkt->time,
-				     peerPktId, FIRST_PACKET_ID));
-
-		    warnx("Call started %u usecs ago!", delay);
-		    timeout =
-			(struct timeval *) malloc(sizeof(struct timeval));
-		    next_timeout(&conv_start, timeout);
-		    expired_pkt_id =
-			last_expired_packet(&conv_start, FIRST_PACKET_ID);
-		    expPktId = peerPktId;
-#ifdef DEBUG
-		    warnx
-			("Next timeout is due in %u usecs! Expired packet is %u",
-			 timeval_load(timeout), expired_pkt_id);
-#endif
+		pkt[peer] = (packet_t *) malloc(sizeof(packet_t));
+		pktid = recvVoicePkts(fd[peer], pkt[peer]);
+		if (pktid >= expected_pkt) {
+		    sendVoicePkts(fd[app], pkt[peer]);
+		    expected_pkt = pktid + 1;
 		}
-		/*      if (timeval_age(&peerPkt->time) < MAX_DELAY) */
-		sendPktsToApp(appSock, peerPkt, &recvQueue, &expPktId);
-/*		else {
-		    warnx("Packet %u is too late! Rejecting..", peerPktId);
-		    free(peerPkt);
-		}*/
-
-#ifdef DEBUG
-		warnx("expPktId=%d", expPktId);
-#endif
-	    }
-	    if (FD_ISSET(appSock, &infds)) {
-		appPkt = (packet_t *) malloc(sizeof(packet_t));
-		appAnswer = recvVoicePkts(appSock, appPkt);
-		/* TODO */
-		sendVoicePkts(pathSock, appPkt);
-	    }
-	} else if (socks < 0) {
-	    err(1, "select()");
+		warnx("pktid %u, expected_pkt %u", pktid, expected_pkt);
+		FD_CLR(fd[peer], &infds);
+	    } else if (FD_ISSET(fd[app], &infds)) {
+		pkt[app] = (packet_t *) malloc(sizeof(packet_t));
+		recvVoicePkts(fd[app], pkt[app]);
+		sendVoicePkts(fd[path], pkt[app]);
+		FD_CLR(fd[app], &infds);
+	    } else
+		errx(ERR_NOFDSET);
+	    socks--;
 	}
     }
-    return 127;			/* we mustn't reach this point! */
+    return 0;
 }

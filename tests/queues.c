@@ -1,19 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
-#include "packet.h"
-#include "queue.h"
-void printQueue(packet_t * queue)
-{
-    packet_t *current = queue;
-
-    fprintf(stderr, "printQueue(): ");
-    while (current != NULL) {
-	printf("%d ", current->id);
-	current = (packet_t *) current->next;
-    }
-    printf("NULL\n");
-}
-
+#include "macro.h"
 int main(int argc, char *argv[])
 {
     int i;

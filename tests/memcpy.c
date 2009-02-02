@@ -1,9 +1,9 @@
 #include <stdio.h>
-#include "packet.h"
+#include "macro.h"
 int main(int argc, char *argv[])
 {
     packet_t packet;
-    char ppacket[PKTSIZE];
+    char ppacket[PACKET_SIZE];
 
     printf("&ppacket = %i\n", &ppacket);
     printf("&ppacket + sizeof(packet.id) = %i\n",

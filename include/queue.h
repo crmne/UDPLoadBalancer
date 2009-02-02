@@ -7,4 +7,5 @@ void insertInQ(packet_t **, packet_t *);
 packet_t *getFirstInQ(packet_t **);
 packet_t *removeFromQ(packet_t **, uint32_t);
 uint32_t checkPktQueue(int, packet_t **, uint32_t);
+void printQueue(packet_t *);
 #endif

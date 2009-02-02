@@ -1,10 +1,8 @@
 #include <stdio.h>
 #include <err.h>
 #include <sys/select.h>
-#include "packet.h"
-#include "conn.h"
-#include "comm.h"
-#include "packet.h"
+#include "macro.h"
+#define HOST "127.0.0.1"
 #define APPPORT 6001
 #define MONPORT 8000
 int main(int argc, char *argv[])
@@ -20,10 +18,10 @@ int main(int argc, char *argv[])
 
     FD_ZERO(&allsetinfds);
 
-    monitorSock = connectToMon(MONPORT);
+    monitorSock = connectToMon(HOST,MONPORT);
     FD_SET(monitorSock, &allsetinfds);
 
-    listenSock = listenFromApp(APPPORT);
+    listenSock = listenFromApp(HOST,APPPORT);
     FD_SET(listenSock, &allsetinfds);
 
     fd = listenSock;

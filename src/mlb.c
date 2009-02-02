@@ -1,146 +1,119 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <string.h>		/* memset */
 #include <err.h>
-#include <sys/select.h>
-#include <string.h>
-#include <unistd.h>
-
+#include <stdlib.h>		/* malloc */
+#include <unistd.h>		/* close */
+#include <stdio.h>		/* printf, fflush -> DEBUG */
 #include "macro.h"
 
+#define NFDS 4
+#define NPKTS 3
+#define NCFGS 3
+#define HOST "127.0.0.1"
 #define APP_PORT 6001
 #define PEER_PORT 7001
 #define MON_PORT 8000
 #define FIRST_PACKET_ID 9999
 
+#define ERR_SELECT 1, "select()"
+#define ERR_MONPACK 2, "Monitor packet not understood"
+#define ERR_NOFDSET 3, "Incoming data, but in no controlled fd. Strange"
+typedef enum types { mon, app, peer, path } types;
+typedef enum cfgn { old, new, tmp } cfgn;
 void reconfigRoutes(config_t * oldcfg, config_t * newcfg)
 {
     int i;
 
+    printf("New Config!");
     for (i = 0; i < oldcfg->n; i++) {
 	close(oldcfg->socket[i]);
     }
     for (i = 0; i < newcfg->n; i++) {
 	newcfg->socket[i] = connectUDP4("127.0.0.1", newcfg->port[i]);
+	printf(" %u", newcfg->port[i]);
     }
+    printf("\n");
+    fflush(stdout);
 }
-
 int main(int argc, char *argv[])
 {
-    int socks, maxfd;
-    char monAnswer;
-    uint32_t appPktId, peerPktId, expired_pkt_id, expPktId =
-	FIRST_PACKET_ID;
-    int monitorSock, appSock, peerSock, pathSock;
-    config_t oldcfg, newcfg, tmpcfg;
-    struct timeval *timeout = NULL, tick;
-    packet_t *appPkt = NULL, *peerPkt = NULL, *recvQueue =
-	NULL, *sendQueue = NULL;
+    int i, socks, maxfd, fd[NFDS];
+    uint32_t expected_pkt;
+    packet_t *pkt[NPKTS], *recvq;
+    config_t cfg[NCFGS];
     fd_set infds, allsetinfds;
 
-    expired_pkt_id = expPktId - 1;
+    expected_pkt = FIRST_PACKET_ID;
 
-    timeval_store(&tick, PACKET_RATE);
+    recvq = NULL;
 
-    memset(&newcfg, 0, sizeof(newcfg));
+    for (i = 0; i < NPKTS; i++)
+	pkt[i] = NULL;
+
+    for (i = 0; i < NCFGS; i++)
+	memset(&cfg[i], 0, sizeof(cfg[i]));
+
     FD_ZERO(&allsetinfds);
 
-    monitorSock = connectToMon("127.0.0.1", MON_PORT);
-    FD_SET(monitorSock, &allsetinfds);
+    fd[mon] = connectToMon(HOST, MON_PORT);
+    FD_SET(fd[mon], &allsetinfds);
 
-    appSock = acceptFromApp(listenFromApp("127.0.0.1", APP_PORT));
-    FD_SET(appSock, &allsetinfds);
+    fd[app] = acceptFromApp(listenFromApp(HOST, APP_PORT));
+    FD_SET(fd[app], &allsetinfds);
 
-    peerSock = listenUDP4("127.0.0.1", PEER_PORT);
-    FD_SET(peerSock, &allsetinfds);
+    fd[peer] = listenUDP4(HOST, PEER_PORT);
+    FD_SET(fd[peer], &allsetinfds);
 
-    maxfd = peerSock;
+    maxfd = fd[peer];
 
-    while (1) {
+    for (;;) {
 	infds = allsetinfds;
-	socks = select(maxfd + 1, &infds, NULL, NULL, timeout);
-	if (socks == 0) {
-	    if (timeval_cmp(&tick, timeout) != 0)
-		memcpy(timeout, &tick, sizeof(tick));
+	socks = select(maxfd + 1, &infds, NULL, NULL, NULL);
+	if (socks <= 0)
+	    err(ERR_SELECT);
+	while (socks > 0) {
+	    if (FD_ISSET(fd[mon], &infds)) {
+		char answ = recvMonitorPkts(fd[mon], &cfg[tmp]);
 
-	    expired_pkt_id++;
-
-	    if (expPktId <= expired_pkt_id)
-		expPktId = expired_pkt_id + 1;
-#ifdef DEBUG
-	    warnx("Tick: Packet %u has expired.. expected is now %u",
-		  expired_pkt_id, expPktId);
-#endif
-
-	} else if (socks > 0) {
-	    if (FD_ISSET(monitorSock, &infds)) {
-		monAnswer = recvMonitorPkts(monitorSock, &tmpcfg);
-		switch (monAnswer) {
+		switch (answ) {
 		case 'A':
-		    manageMonAck(&tmpcfg, appPkt, sendQueue);
+		    manageMonAck(&cfg[tmp], pkt[app]);
+		    warnx("ACK");
 		    break;
 		case 'N':
-		    manageMonNack(&tmpcfg, appPkt, &newcfg);
+		    manageMonNack(&cfg[tmp], pkt[app], &cfg[new]);
+		    warnx("NACK");
 		    break;
 		case 'C':
-		    oldcfg = newcfg;
-		    newcfg = tmpcfg;
-		    reconfigRoutes(&oldcfg, &newcfg);
+		    cfg[old] = cfg[new];
+		    cfg[new] = cfg[tmp];
+		    reconfigRoutes(&cfg[old], &cfg[new]);
 		    break;
 		default:
-		    errx(1, "Monitor packet not understood!");
+		    errx(ERR_MONPACK);
 		}
-	    }
-	    if (FD_ISSET(appSock, &infds)) {
-		appPkt = (packet_t *) malloc(sizeof(packet_t));
-		appPktId = recvVoicePkts(appSock, appPkt);
-		pathSock = selectPath(&newcfg);
-		if (appPkt->id > 5)
-		    sendVoicePkts(pathSock, appPkt);
-	    }
-	    if (FD_ISSET(peerSock, &infds)) {
-		peerPkt = (packet_t *) malloc(sizeof(packet_t));
-		peerPktId = recvVoicePkts(peerSock, peerPkt);
-		if (timeout == NULL) {
-		    /* calcolare l'inizio della chiamata */
-		    uint32_t delay = timeval_age(&peerPkt->time);
 
-		    delay += (peerPktId - FIRST_PACKET_ID) * PACKET_RATE;
-		    expPktId = peerPktId;
-		    warnx("Call started %u usecs ago!", delay);
-		    /* calcolare il tempo che manca per far scadere il
-		       primo pacchetto */
-		    timeout =
-			(struct timeval *) malloc(sizeof(struct timeval));
-		    if (delay < MAX_TIME) {
-			delay = MAX_TIME - delay;
-		    } else {
-			delay -= MAX_TIME;
-			expired_pkt_id =
-			    FIRST_PACKET_ID + (delay / PACKET_RATE);
-			delay = PACKET_RATE - (delay % PACKET_RATE);
+		FD_CLR(fd[mon], &infds);
+	    } else if (FD_ISSET(fd[app], &infds)) {
+		pkt[app] = (packet_t *) malloc(sizeof(packet_t));
+		recvVoicePkts(fd[app], pkt[app]);
+		fd[path] = selectPath(&cfg[new]);
+		sendVoicePkts(fd[path], pkt[app]);
+		FD_CLR(fd[app], &infds);
+	    } else if (FD_ISSET(fd[peer], &infds)) {
+		uint32_t pktid;
 
-		    }
-		    timeval_store(timeout, delay);
-#ifdef DEBUG
-		    warnx
-			("Next timeout is due in %u usecs! Expired packet is %u",
-			 delay, expired_pkt_id);
-#endif
-
+		pkt[peer] = (packet_t *) malloc(sizeof(packet_t));
+		pktid = recvVoicePkts(fd[peer], pkt[peer]);
+		if (pktid >= expected_pkt) {
+		    sendVoicePkts(fd[app], pkt[peer]);
+		    expected_pkt = pktid + 1;
 		}
-/*		if (timeval_age(&peerPkt->time) < MAX_DELAY)*/
-		sendPktsToApp(appSock, peerPkt, &recvQueue, &expPktId);
-/*		else {
-		    warnx("Packet %u is too late! Rejecting..", peerPktId);
-		    free(peerPkt);
-		}*/
-#ifdef DEBUG
-		warnx("expPktId=%d", expPktId);
-#endif
-	    }
-	} else {
-	    err(1, "select()");
+		warnx("pktid %u, expected_pkt %u", pktid, expected_pkt);
+		FD_CLR(fd[peer], &infds);
+	    } else
+		errx(ERR_NOFDSET);
+	    socks--;
 	}
     }
-    return 127;			/* we mustn't reach this point! */
+    return 0;
 }
