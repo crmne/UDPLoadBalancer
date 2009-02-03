@@ -9,28 +9,43 @@
 
 #include "macro.h"
 
+void reconf_routes(config_t * oldcfg, config_t * newcfg)
+{
+    int i;
+
+    printf("New Config!");
+    for (i = 0; i < oldcfg->n; i++)
+    {
+	close(oldcfg->socket[i]);
+    }
+    for (i = 0; i < newcfg->n; i++)
+    {
+	newcfg->socket[i] = connect_udp("127.0.0.1", newcfg->port[i]);
+	printf(" %u", newcfg->port[i]);
+    }
+    printf("\n");
+    fflush(stdout);
+}
+
 int get_local_port(int socketfd)
 {
     int ris;
-    struct sockaddr_in Local;
+    struct sockaddr_in local;
     unsigned int addr_size;
 
-    addr_size = sizeof(Local);
-    memset((char *) &Local, 0, sizeof(Local));
-    Local.sin_family = AF_INET;
-    ris = getsockname(socketfd, (struct sockaddr *) &Local, &addr_size);
-    if (ris < 0) {
-	perror("getsockname() failed: ");
+    addr_size = sizeof(local);
+    memset((char *) &local, 0, sizeof(local));
+    local.sin_family = AF_INET;
+    ris = getsockname(socketfd, (struct sockaddr *) &local, &addr_size);
+    if (ris < 0)
+    {
+	warn("getsockname()");
 	return (0);
-    } else {
-	/*
-	   fprintf(stderr,"IP %s port %d\n", inet_ntoa(Local.sin_addr), ntohs(Local.sin_port) );
-	 */
-	return (ntohs(Local.sin_port));
     }
+    return (ntohs(local.sin_port));
 }
 
-uint32_t recvVoicePkts(int socketfd, packet_t * packet)
+uint32_t recv_voice_pkts(int socketfd, packet_t * packet)
 {
     int n;
     char ppacket[PACKET_SIZE];
@@ -39,8 +54,8 @@ uint32_t recvVoicePkts(int socketfd, packet_t * packet)
     if (n == 0)
 	errx(2, "Nothing received, maybe the other end is down? Exiting.");
     if (n != sizeof(ppacket))
-	err(1, "recvVoicePkts(socketfd=%d,...): read(packet)=%d", socketfd,
-	    n);
+	err(1, "recv_voice_pkts(socketfd=%d,...): read(packet)=%d",
+	    socketfd, n);
 
     memcpy(&packet->id, &ppacket, sizeof(packet->id));
     memcpy(&packet->time, (char *) &ppacket + sizeof(packet->id),
@@ -67,7 +82,7 @@ uint32_t recvVoicePkts(int socketfd, packet_t * packet)
     return packet->id;
 }
 
-void sendVoicePkts(int socketfd, packet_t * packet)
+void send_voice_pkts(int socketfd, packet_t * packet)
 {
     int n;
     char ppacket[PACKET_SIZE];
@@ -81,8 +96,8 @@ void sendVoicePkts(int socketfd, packet_t * packet)
 		 sizeof(packet->time) + sizeof(packet->data), &packet->pa);*/
     n = write(socketfd, &ppacket, sizeof(ppacket));
     if (n != sizeof(ppacket))
-	err(1, "sendVoicePkts(socketfd=%d,...): write(packet)%u", socketfd,
-	    sizeof(ppacket));
+	err(1, "send_voice_pkts(socketfd=%d,...): write(packet)%u",
+	    socketfd, sizeof(ppacket));
 #ifdef DEBUG
     printf("Sending voice packet %u, delay = %u usec\n", packet->id,
 	   timeval_age(&packet->time));
@@ -91,26 +106,30 @@ void sendVoicePkts(int socketfd, packet_t * packet)
 
 }
 
-void sendPktsToApp(int appSock, packet_t * peerPkt, packet_t ** pktQueue,
-		   uint32_t * expPktId)
+void send_app(int appSock, packet_t * peerPkt, packet_t ** pktQueue,
+	      uint32_t * expPktId)
 {
     packet_t *first;
 
-    if (peerPkt->id == *expPktId) {
-	sendVoicePkts(appSock, peerPkt);
+    if (peerPkt->id == *expPktId)
+    {
+	send_voice_pkts(appSock, peerPkt);
 	*expPktId = peerPkt->id + 1;
 	free(peerPkt);
-	if (*pktQueue != NULL) {
-	    while ((first = getFirstInQ(pktQueue)) != NULL
-		   && first->id == *expPktId) {
-		sendVoicePkts(appSock, first);
+	if (*pktQueue != NULL)
+	{
+	    while ((first = q_extract_first(pktQueue)) != NULL
+		   && first->id == *expPktId)
+	    {
+		send_voice_pkts(appSock, first);
 		*expPktId = first->id + 1;
 		free(first);
 	    }
 	}
-    } else {
-	insertInQ(pktQueue, peerPkt);
-	printQueue(*pktQueue);
+    } else
+    {
+	q_insert(pktQueue, peerPkt);
+	q_print(*pktQueue);
 	is_not_exp_pkt(peerPkt, *expPktId);
     }
 }
@@ -120,7 +139,7 @@ void sendPktsToApp(int appSock, packet_t * peerPkt, packet_t ** pktQueue,
  * @param buffer
  * @return C for config, A for ack, N for nack
  */
-char recvMonitorPkts(int socketfd, config_t * newconfig)
+char recv_mon(int socketfd, config_t * newconfig)
 {
     int n, i;
     char answer;
@@ -129,17 +148,19 @@ char recvMonitorPkts(int socketfd, config_t * newconfig)
     if (n == 0)
 	errx(2, "Nothing received, maybe Monitor is down? Exiting.");
     if (n != sizeof(answer))
-	err(1, "recvMonitorPkts(socketfd=%d,...): read(answer)", socketfd);
+	err(1, "recv_mon(socketfd=%d,...): read(answer)", socketfd);
     newconfig->type = answer;
     n = read(socketfd, &newconfig->n, sizeof(newconfig->n));
     if (n != sizeof(newconfig->n))
-	err(1, "recvMonitorPkts(socketfd=%d,...): read(n)", socketfd);
-    if (answer == 'C') {
-	for (i = 0; i < newconfig->n; i++) {
+	err(1, "recv_mon(socketfd=%d,...): read(n)", socketfd);
+    if (answer == 'C')
+    {
+	for (i = 0; i < newconfig->n; i++)
+	{
 	    n = read(socketfd, &newconfig->port[i],
 		     sizeof(newconfig->port[i]));
 	    if (n != sizeof(newconfig->port[i]))
-		err(1, "recvMonitorPkts(socketfd=%d,...): read(port[%d])",
+		err(1, "recv_mon(socketfd=%d,...): read(port[%d])",
 		    socketfd, i);
 	}
     }

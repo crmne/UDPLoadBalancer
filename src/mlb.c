@@ -19,21 +19,6 @@
 #define ERR_NOFDSET 3, "Incoming data, but in no controlled fd. Strange"
 typedef enum types { mon, app, peer, path } types;
 typedef enum cfgn { old, new, tmp } cfgn;
-void reconfigRoutes(config_t * oldcfg, config_t * newcfg)
-{
-    int i;
-
-    printf("New Config!");
-    for (i = 0; i < oldcfg->n; i++) {
-	close(oldcfg->socket[i]);
-    }
-    for (i = 0; i < newcfg->n; i++) {
-	newcfg->socket[i] = connectUDP4("127.0.0.1", newcfg->port[i]);
-	printf(" %u", newcfg->port[i]);
-    }
-    printf("\n");
-    fflush(stdout);
-}
 int main(int argc, char *argv[])
 {
     int i, socks, maxfd, fd[NFDS];
@@ -54,58 +39,65 @@ int main(int argc, char *argv[])
 
     FD_ZERO(&allsetinfds);
 
-    fd[mon] = connectToMon(HOST, MON_PORT);
+    fd[mon] = connect_mon(HOST, MON_PORT);
     FD_SET(fd[mon], &allsetinfds);
 
-    fd[app] = acceptFromApp(listenFromApp(HOST, APP_PORT));
+    fd[app] = accept_app(listen_app(HOST, APP_PORT));
     FD_SET(fd[app], &allsetinfds);
 
-    fd[peer] = listenUDP4(HOST, PEER_PORT);
+    fd[peer] = listen_udp(HOST, PEER_PORT);
     FD_SET(fd[peer], &allsetinfds);
 
     maxfd = fd[peer];
 
-    for (;;) {
+    for (;;)
+    {
 	infds = allsetinfds;
 	socks = select(maxfd + 1, &infds, NULL, NULL, NULL);
 	if (socks <= 0)
 	    err(ERR_SELECT);
-	while (socks > 0) {
-	    if (FD_ISSET(fd[mon], &infds)) {
-		char answ = recvMonitorPkts(fd[mon], &cfg[tmp]);
+	while (socks > 0)
+	{
+	    if (FD_ISSET(fd[mon], &infds))
+	    {
+		char answ = recv_mon(fd[mon], &cfg[tmp]);
 
-		switch (answ) {
+		switch (answ)
+		{
 		case 'A':
-		    manageMonAck(&cfg[tmp], pkt[app]);
+		    manage_ack(&cfg[tmp], pkt[app]);
 		    warnx("ACK");
 		    break;
 		case 'N':
-		    manageMonNack(&cfg[tmp], pkt[app], &cfg[new]);
+		    manage_nack(&cfg[tmp], pkt[app], &cfg[new]);
 		    warnx("NACK");
 		    break;
 		case 'C':
 		    cfg[old] = cfg[new];
 		    cfg[new] = cfg[tmp];
-		    reconfigRoutes(&cfg[old], &cfg[new]);
+		    reconf_routes(&cfg[old], &cfg[new]);
 		    break;
 		default:
 		    errx(ERR_MONPACK);
 		}
 
 		FD_CLR(fd[mon], &infds);
-	    } else if (FD_ISSET(fd[app], &infds)) {
+	    } else if (FD_ISSET(fd[app], &infds))
+	    {
 		pkt[app] = (packet_t *) malloc(sizeof(packet_t));
-		recvVoicePkts(fd[app], pkt[app]);
-		fd[path] = selectPath(&cfg[new]);
-		sendVoicePkts(fd[path], pkt[app]);
+		recv_voice_pkts(fd[app], pkt[app]);
+		fd[path] = select_path(&cfg[new]);
+		send_voice_pkts(fd[path], pkt[app]);
 		FD_CLR(fd[app], &infds);
-	    } else if (FD_ISSET(fd[peer], &infds)) {
+	    } else if (FD_ISSET(fd[peer], &infds))
+	    {
 		uint32_t pktid;
 
 		pkt[peer] = (packet_t *) malloc(sizeof(packet_t));
-		pktid = recvVoicePkts(fd[peer], pkt[peer]);
-		if (pktid >= expected_pkt) {
-		    sendVoicePkts(fd[app], pkt[peer]);
+		pktid = recv_voice_pkts(fd[peer], pkt[peer]);
+		if (pktid >= expected_pkt)
+		{
+		    send_voice_pkts(fd[app], pkt[peer]);
 		    expected_pkt = pktid + 1;
 		}
 		warnx("pktid %u, expected_pkt %u", pktid, expected_pkt);

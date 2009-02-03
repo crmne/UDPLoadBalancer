@@ -5,9 +5,9 @@
 #include "packet.h"
 #include PROTO_H
 
-int selectPath(config_t *);
-void manageMonAck(config_t *, packet_t *);
-void manageMonNack(config_t *, packet_t *, config_t *);
+int select_path(config_t *);
+void manage_ack(config_t *, packet_t *);
+void manage_nack(config_t *, packet_t *, config_t *);
 void pa_cpy_to_pp(char *, struct packet_additions_t *);
 void pa_cpy_from_pp(struct packet_additions_t *, char *);
 void is_not_exp_pkt(packet_t *, uint32_t);

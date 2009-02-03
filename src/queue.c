@@ -2,49 +2,62 @@
 #include <stdio.h>
 #include <err.h>
 #include "macro.h"
-void insertInQ(packet_t ** pktQueue, packet_t * packet)
+void q_insert(packet_t ** pktQueue, packet_t * packet)
 {
     packet_t *current, *prev;
 
     packet->next = NULL;
-    if (*pktQueue == NULL) {
+    if (*pktQueue == NULL)
+    {
 	*pktQueue = packet;
-    } else {
+    } else
+    {
 	current = *pktQueue;
 	prev = NULL;
-	while (current != NULL) {
-	    if (packet->id > current->id) {
-		if (current->next != NULL) {
+	while (current != NULL)
+	{
+	    if (packet->id > current->id)
+	    {
+		if (current->next != NULL)
+		{
 		    prev = current;
 		    current = (packet_t *) current->next;
-		} else {
+		} else
+		{
 		    current->next = (struct packet_t *) packet;
 		    current = NULL;
 		}
-	    } else if (packet->id < current->id) {
-		if (prev == NULL) {
+	    } else if (packet->id < current->id)
+	    {
+		if (prev == NULL)
+		{
 		    *pktQueue = packet;
-		} else {
+		} else
+		{
 		    prev->next = (struct packet_t *) packet;
 		}
 		packet->next = (struct packet_t *) current;
 		current = NULL;
-	    } else {
+	    } else
+	    {
 		errx(1,
 		     "Oh my god two packets with the same id in Queue!");
 	    }
 	}
     }
 }
-packet_t *getFirstInQ(packet_t ** pktQueue)
+packet_t *q_extract_first(packet_t ** pktQueue)
 {
     packet_t *first = NULL;
 
-    if (*pktQueue != NULL) {
+    if (*pktQueue != NULL)
+    {
 	first = *pktQueue;
-	if (first->next == NULL) {
+	if (first->next == NULL)
+	{
 	    *pktQueue = NULL;
-	} else {
+	} else
+	{
 	    *pktQueue = (packet_t *) first->next;
 	    first->next = NULL;
 	}
@@ -52,20 +65,23 @@ packet_t *getFirstInQ(packet_t ** pktQueue)
     return first;
 }
 
-packet_t *removeFromQ(packet_t ** pktQueue, uint32_t id)
+packet_t *q_remove(packet_t ** pktQueue, uint32_t id)
 {
     packet_t *current = NULL, *prev;
 
-    if (*pktQueue != NULL) {
+    if (*pktQueue != NULL)
+    {
 	current = *pktQueue;
 	prev = NULL;
 	if (id == current->id)
-	    return getFirstInQ(pktQueue);
-	while (current != NULL && id != current->id) {
+	    return q_extract_first(pktQueue);
+	while (current != NULL && id != current->id)
+	{
 	    prev = current;
 	    current = (packet_t *) current->next;
 	}
-	if (current != NULL) {
+	if (current != NULL)
+	{
 	    prev->next = current->next;
 	}
     }
@@ -76,20 +92,23 @@ uint32_t removeLessQ(packet_t ** pktQueue, uint32_t id)
 {
     int removed = 0;
 
-    while (*pktQueue != NULL && id >= (*pktQueue)->id) {
-	getFirstInQ(pktQueue);
+    while (*pktQueue != NULL && id >= (*pktQueue)->id)
+    {
+	q_extract_first(pktQueue);
 	removed++;
     }
     return removed;
 }
 
-void printQueue(packet_t * queue)
+void q_print(packet_t * queue)
 {
     packet_t *current = queue;
 
-    if (current != NULL) {
+    if (current != NULL)
+    {
 	fprintf(stderr, "Queue: ");
-	while (current != NULL) {
+	while (current != NULL)
+	{
 	    fprintf(stderr, "%d ", current->id);
 	    current = (packet_t *) current->next;
 	}
@@ -98,7 +117,7 @@ void printQueue(packet_t * queue)
 }
 
 /*uint32_t
-checkPktQueue (int socketfd, packet_t ** pktQueue, uint32_t expPktId)
+q_check (int socketfd, packet_t ** pktQueue, uint32_t expPktId)
 {
   uint32_t lastone = 0;
   if (current != NULL)
@@ -106,10 +125,10 @@ checkPktQueue (int socketfd, packet_t ** pktQueue, uint32_t expPktId)
     if (MAXDELAY - timeval_load (current->time) <= CHECKTIME + 5)
     {
       lastone = current->id;
-      while ((current = getFirstInQ (pktQueue)) != NULL)
+      while ((current = q_extract_first (pktQueue)) != NULL)
       {
 	if (current->id >= expPktId)
-	  sendVoicePkts (socketfd, current);
+	  send_voice_pkts (socketfd, current);
 	free (current);
       }
     }

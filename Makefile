@@ -28,9 +28,9 @@ flb: $(CORE) src/flb.o
 
 indent:
 	@if which indent && [ "`indent --version | cut -d' ' -f1`" == "GNU" ]; \
-	then indent ${SOURCES} -kr -nhnl -bad -bap; \
+	then indent ${SOURCES} -kr -nhnl -bl -bli0 -bad -bap; \
 	else for i in ${SOURCES}; do \
-	indent -nbad -bap -nbc -br -brs -c33 -cd33 -ncdb -ce -ci4 -cli0 -d0 -di1 -nfc1 -i4 -ip0 -l75 -lp -npcs -npsl -nsc -nsob $$i; done; fi
+	indent -nbad -bap -nbc -bl -bli0 -brs -c33 -cd33 -ncdb -ce -ci4 -cli0 -d0 -di1 -nfc1 -i4 -ip0 -l75 -lp -npcs -npsl -nsc -nsob $$i; done; fi
 
 cleanplot:
 	-rm *.png fit.log

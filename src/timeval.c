@@ -4,7 +4,8 @@ uint32_t timeval_diff(const struct timeval *a, const struct timeval *b)
 {
     uint32_t r;
 
-    if (timeval_cmp(a, b) < 0) {
+    if (timeval_cmp(a, b) < 0)
+    {
 	const struct timeval *c;
 
 	c = a;
@@ -29,7 +30,8 @@ struct timeval *timeval_sub(struct timeval *tv, uint32_t v)
 
     if (tv->tv_usec >= (suseconds_t) v)
 	tv->tv_usec -= (suseconds_t) v;
-    else {
+    else
+    {
 	tv->tv_sec--;
 	tv->tv_usec += (suseconds_t) (USEC_PER_SEC - v);
     }
@@ -46,7 +48,8 @@ struct timeval *timeval_add(struct timeval *tv, uint32_t v)
 
     tv->tv_usec += (suseconds_t) v;
 
-    while ((unsigned) tv->tv_usec >= USEC_PER_SEC) {
+    while ((unsigned) tv->tv_usec >= USEC_PER_SEC)
+    {
 	tv->tv_sec++;
 	tv->tv_usec -= (suseconds_t) USEC_PER_SEC;
     }

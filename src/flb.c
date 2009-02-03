@@ -31,37 +31,42 @@ int main(int argc, char *argv[])
 
     FD_ZERO(&allsetinfds);
 
-    fd[app] = acceptFromApp(listenFromApp(HOST, APP_PORT));
+    fd[app] = accept_app(listen_app(HOST, APP_PORT));
     FD_SET(fd[app], &allsetinfds);
 
-    fd[peer] = listenUDP4(HOST, PEER_PORT);
+    fd[peer] = listen_udp(HOST, PEER_PORT);
     FD_SET(fd[peer], &allsetinfds);
 
-    fd[path] = connectUDP4(HOST, PATH_PORT);
+    fd[path] = connect_udp(HOST, PATH_PORT);
 
     maxfd = fd[peer];
 
-    for (;;) {
+    for (;;)
+    {
 	infds = allsetinfds;
 	socks = select(maxfd + 1, &infds, NULL, NULL, NULL);
 	if (socks <= 0)
 	    err(ERR_SELECT);
-	while (socks > 0) {
-	    if (FD_ISSET(fd[peer], &infds)) {
+	while (socks > 0)
+	{
+	    if (FD_ISSET(fd[peer], &infds))
+	    {
 		uint32_t pktid;
 
 		pkt[peer] = (packet_t *) malloc(sizeof(packet_t));
-		pktid = recvVoicePkts(fd[peer], pkt[peer]);
-		if (pktid >= expected_pkt) {
-		    sendVoicePkts(fd[app], pkt[peer]);
+		pktid = recv_voice_pkts(fd[peer], pkt[peer]);
+		if (pktid >= expected_pkt)
+		{
+		    send_voice_pkts(fd[app], pkt[peer]);
 		    expected_pkt = pktid + 1;
 		}
 		warnx("pktid %u, expected_pkt %u", pktid, expected_pkt);
 		FD_CLR(fd[peer], &infds);
-	    } else if (FD_ISSET(fd[app], &infds)) {
+	    } else if (FD_ISSET(fd[app], &infds))
+	    {
 		pkt[app] = (packet_t *) malloc(sizeof(packet_t));
-		recvVoicePkts(fd[app], pkt[app]);
-		sendVoicePkts(fd[path], pkt[app]);
+		recv_voice_pkts(fd[app], pkt[app]);
+		send_voice_pkts(fd[path], pkt[app]);
 		FD_CLR(fd[app], &infds);
 	    } else
 		errx(ERR_NOFDSET);

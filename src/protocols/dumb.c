@@ -5,26 +5,30 @@
 
 struct packet_additions_t next_pa;
 
-int selectPath(config_t * config)
+int select_path(config_t * config)
 {
     return config->socket[0];
 }
 
-void manageMonAck(config_t * ack, packet_t * lastSent)
+void manage_ack(config_t * ack, packet_t * lastSent)
 {
-    if (lastSent->id == ack->n) {
+    if (lastSent->id == ack->n)
+    {
 	free(lastSent);
-    } else {
+    } else
+    {
 	warnx("ACK %u, LASTSENT %u", ack->n, lastSent->id);
-	/* insertInQ(&sendQueue, lastSent); ?? */
+	/* q_insert(&sendQueue, lastSent); ?? */
     }
 }
 
-void manageMonNack(config_t * nack, packet_t * lastSent, config_t * config)
+void manage_nack(config_t * nack, packet_t * lastSent, config_t * config)
 {
-    if (lastSent->id == nack->n) {
-	sendVoicePkts(selectPath(config), lastSent);
-    } else {
+    if (lastSent->id == nack->n)
+    {
+	send_voice_pkts(select_path(config), lastSent);
+    } else
+    {
 	warnx("NACK %u, LASTSENT %u", nack->n, lastSent->id);
     }
 }

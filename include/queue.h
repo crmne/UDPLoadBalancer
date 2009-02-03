@@ -3,9 +3,9 @@
 
 #include "packet.h"
 
-void insertInQ(packet_t **, packet_t *);
-packet_t *getFirstInQ(packet_t **);
-packet_t *removeFromQ(packet_t **, uint32_t);
-uint32_t checkPktQueue(int, packet_t **, uint32_t);
-void printQueue(packet_t *);
+void q_insert(packet_t **, packet_t *);
+packet_t *q_extract_first(packet_t **);
+packet_t *q_remove(packet_t **, uint32_t);
+uint32_t q_check(int, packet_t **, uint32_t);
+void q_print(packet_t *);
 #endif
