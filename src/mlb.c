@@ -1,8 +1,8 @@
-#include <string.h>		/* memset */
+#include <string.h>             /* memset */
 #include <err.h>
-#include <stdlib.h>		/* malloc */
-#include <unistd.h>		/* close */
-#include <stdio.h>		/* printf, fflush -> DEBUG */
+#include <stdlib.h>             /* malloc */
+#include <unistd.h>             /* close */
+#include <stdio.h>              /* printf, fflush -> DEBUG */
 #include "macro.h"
 
 #define NFDS 4
@@ -17,8 +17,12 @@
 #define ERR_SELECT 1, "select()"
 #define ERR_MONPACK 2, "Monitor packet not understood"
 #define ERR_NOFDSET 3, "Incoming data, but in no controlled fd. Strange"
-typedef enum types { mon, app, peer, path } types;
-typedef enum cfgn { old, new, tmp } cfgn;
+typedef enum types {
+    mon, app, peer, path
+} types;
+typedef enum cfgn {
+    old, new, tmp
+} cfgn;
 int main(int argc, char *argv[])
 {
     int i, socks, maxfd, fd[NFDS];
@@ -32,10 +36,10 @@ int main(int argc, char *argv[])
     recvq = NULL;
 
     for (i = 0; i < NPKTS; i++)
-	pkt[i] = NULL;
+        pkt[i] = NULL;
 
     for (i = 0; i < NCFGS; i++)
-	memset(&cfg[i], 0, sizeof(cfg[i]));
+        memset(&cfg[i], 0, sizeof(cfg[i]));
 
     FD_ZERO(&allsetinfds);
 
@@ -50,62 +54,59 @@ int main(int argc, char *argv[])
 
     maxfd = fd[peer];
 
-    for (;;)
-    {
-	infds = allsetinfds;
-	socks = select(maxfd + 1, &infds, NULL, NULL, NULL);
-	if (socks <= 0)
-	    err(ERR_SELECT);
-	while (socks > 0)
-	{
-	    if (FD_ISSET(fd[mon], &infds))
-	    {
-		char answ = recv_mon(fd[mon], &cfg[tmp]);
+    for (;;) {
+        infds = allsetinfds;
+        socks = select(maxfd + 1, &infds, NULL, NULL, NULL);
+        if (socks <= 0)
+            err(ERR_SELECT);
+        while (socks > 0) {
+            if (FD_ISSET(fd[mon], &infds)) {
+                char answ = recv_mon(fd[mon], &cfg[tmp]);
 
-		switch (answ)
-		{
-		case 'A':
-		    manage_ack(&cfg[tmp], pkt[app]);
-		    warnx("ACK");
-		    break;
-		case 'N':
-		    manage_nack(&cfg[tmp], pkt[app], &cfg[new]);
-		    warnx("NACK");
-		    break;
-		case 'C':
-		    cfg[old] = cfg[new];
-		    cfg[new] = cfg[tmp];
-		    reconf_routes(&cfg[old], &cfg[new]);
-		    break;
-		default:
-		    errx(ERR_MONPACK);
-		}
+                switch (answ) {
+                case 'A':
+                    manage_ack(&cfg[tmp], pkt[app]);
+                    warnx("ACK");
+                    break;
+                case 'N':
+                    manage_nack(&cfg[tmp], pkt[app], &cfg[new]);
+                    warnx("NACK");
+                    break;
+                case 'C':
+                    cfg[old] = cfg[new];
+                    cfg[new] = cfg[tmp];
+                    reconf_routes(&cfg[old], &cfg[new]);
+                    break;
+                default:
+                    errx(ERR_MONPACK);
+                }
 
-		FD_CLR(fd[mon], &infds);
-	    } else if (FD_ISSET(fd[app], &infds))
-	    {
-		pkt[app] = (packet_t *) malloc(sizeof(packet_t));
-		recv_voice_pkts(fd[app], pkt[app]);
-		fd[path] = select_path(&cfg[new]);
-		send_voice_pkts(fd[path], pkt[app]);
-		FD_CLR(fd[app], &infds);
-	    } else if (FD_ISSET(fd[peer], &infds))
-	    {
-		uint32_t pktid;
+                FD_CLR(fd[mon], &infds);
+            } else if (FD_ISSET(fd[app], &infds)) {
+                pkt[app] = (packet_t *) malloc(sizeof(packet_t));
+                recv_voice_pkts(fd[app], pkt[app]);
 
-		pkt[peer] = (packet_t *) malloc(sizeof(packet_t));
-		pktid = recv_voice_pkts(fd[peer], pkt[peer]);
-		if (pktid >= expected_pkt)
-		{
-		    send_voice_pkts(fd[app], pkt[peer]);
-		    expected_pkt = pktid + 1;
-		}
-		warnx("pktid %u, expected_pkt %u", pktid, expected_pkt);
-		FD_CLR(fd[peer], &infds);
-	    } else
-		errx(ERR_NOFDSET);
-	    socks--;
-	}
+                fd[path] = select_path(&cfg[new]);
+                /* select path */
+                /*fd[path] = cfg[new].socket[(((pkt[app]->id / (25 / cfg[new].n)) - 1 ) % cfg[new].n)]; */
+
+                send_voice_pkts(fd[path], pkt[app]);
+                FD_CLR(fd[app], &infds);
+            } else if (FD_ISSET(fd[peer], &infds)) {
+                uint32_t pktid;
+
+                pkt[peer] = (packet_t *) malloc(sizeof(packet_t));
+                pktid = recv_voice_pkts(fd[peer], pkt[peer]);
+                if (pktid >= expected_pkt) {
+                    send_voice_pkts(fd[app], pkt[peer]);
+                    expected_pkt = pktid + 1;
+                }
+                warnx("pktid %u, expected_pkt %u", pktid, expected_pkt);
+                FD_CLR(fd[peer], &infds);
+            } else
+                errx(ERR_NOFDSET);
+            socks--;
+        }
     }
     return 0;
 }

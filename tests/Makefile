@@ -32,4 +32,4 @@ lb_fixed: $(CORE) lb_fixed.o
 	${LD} ${LDFLAGS} $^ -o $@
 
 clean:
-	-rm *.o $(TESTS)
+	-rm *.o $(TESTS) 2> /dev/null

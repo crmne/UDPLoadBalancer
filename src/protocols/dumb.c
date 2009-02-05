@@ -12,24 +12,20 @@ int select_path(config_t * config)
 
 void manage_ack(config_t * ack, packet_t * lastSent)
 {
-    if (lastSent->id == ack->n)
-    {
-	free(lastSent);
-    } else
-    {
-	warnx("ACK %u, LASTSENT %u", ack->n, lastSent->id);
-	/* q_insert(&sendQueue, lastSent); ?? */
+    if (lastSent->id == ack->n) {
+        free(lastSent);
+    } else {
+        warnx("ACK %u, LASTSENT %u", ack->n, lastSent->id);
+        /* q_insert(&sendQueue, lastSent); ?? */
     }
 }
 
 void manage_nack(config_t * nack, packet_t * lastSent, config_t * config)
 {
-    if (lastSent->id == nack->n)
-    {
-	send_voice_pkts(select_path(config), lastSent);
-    } else
-    {
-	warnx("NACK %u, LASTSENT %u", nack->n, lastSent->id);
+    if (lastSent->id == nack->n) {
+        send_voice_pkts(select_path(config), lastSent);
+    } else {
+        warnx("NACK %u, LASTSENT %u", nack->n, lastSent->id);
     }
 }
 
@@ -42,7 +38,7 @@ void pa_cpy_from_pp(struct packet_additions_t *pa, char *pp)
 {
     memcpy(pa, pp, sizeof(pa));
     if (pa->ack_prev_p == 'N')
-	warnx("PROTO: NACK");
+        warnx("PROTO: NACK");
 }
 
 void is_not_exp_pkt(packet_t * packet, uint32_t exp_id)

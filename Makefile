@@ -12,7 +12,7 @@ LD=@echo "Linking $@ ...";cc
 .PHONY: clean cleanindent cleanplot cleansubdirs $(SUBDIRS)
 
 all: subdirs $(EXECUTABLES)
-	@echo Done. Hint: use tests/test.sh then tests/plot.sh
+	@echo Done.
 subdirs: $(SUBDIRS)
 
 $(SUBDIRS):
@@ -27,21 +27,20 @@ flb: $(CORE) src/flb.o
 	${LD} ${LDFLAGS} $^ -o $@
 
 indent:
-	@if which indent && [ "`indent --version | cut -d' ' -f1`" == "GNU" ]; \
-	then indent ${SOURCES} -kr -nhnl -bl -bli0 -bad -bap; \
-	else for i in ${SOURCES}; do \
-	indent -nbad -bap -nbc -bl -bli0 -brs -c33 -cd33 -ncdb -ce -ci4 -cli0 -d0 -di1 -nfc1 -i4 -ip0 -l75 -lp -npcs -npsl -nsc -nsob $$i; done; fi
+	@if which indent && \
+		[ "`indent --version 2> /dev/null | cut -d' ' -f1`" == "GNU" ];\
+	then indent ${SOURCES} -kr -nhnl -nut; \
+	else echo "Sorry, GNU indent required!"; fi
 
 cleanplot:
-	-rm *.png fit.log
+	-rm *.png fit.log 2> /dev/null
 
 cleanindent:
-	-for i in ${SOURCES}; do rm -f $$i~; done
-	-rm -f *.BAK
+	-for i in ${SOURCES}; do rm -f $$i~ 2> /dev/null; done
 
 cleansubdirs:
 	-for i in $(SUBDIRS); do $(MAKE) -C "$${i}" clean; done
 
 clean:	cleansubdirs cleanindent cleanplot
-	-rm -f core* *.stackdump *.txt
-	-rm -f $(EXECUTABLES) src/*.o src/protocols/*.o
+	-rm -f core* *.stackdump *.txt 2> /dev/null
+	-rm -f $(EXECUTABLES) src/*.o src/protocols/*.o 2> /dev/null
