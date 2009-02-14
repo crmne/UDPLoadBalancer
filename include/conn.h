@@ -3,11 +3,12 @@
 
 #include <netinet/in.h>
 
-int createSocket4(int);
-struct sockaddr_in setSocket4(const char *, int);
-int listenFromApp(int);
-int acceptFromApp(int);
-int connectToMon(int);
-int listenUDP4(int);
+int create_sock(int);
+struct sockaddr_in set_sock(const char *, int);
+int listen_app(const char *, int);
+int accept_app(int);
+int connect_mon(const char *, int);
+int listen_udp(const char *, int);
+int connect_udp(const char *, int);
 
 #endif

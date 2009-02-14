@@ -1,9 +1,12 @@
 #ifndef __COMM_H__
 #define __COMM_H__
 
-char recvMonitorPkts(int, config_t *);
-uint32_t recvVoicePkts(int, packet_t *);
-void sendVoicePkts(int, packet_t *);
-uint32_t sendPktsToApp(int, packet_t *, packet_t *, uint32_t);
+#include "packet.h"
+
+void reconf_routes(config_t *, config_t *);
+char recv_mon(int, config_t *);
+uint32_t recv_voice_pkts(int, packet_t *);
+void send_voice_pkts(int, packet_t *);
+void send_app(int, packet_t *, packet_t **, uint32_t *);
 
 #endif

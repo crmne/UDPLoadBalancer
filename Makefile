@@ -1,17 +1,18 @@
-INCLUDES=-Iinclude
-LDFLAGS=-lpthread -lm
-CFLAGS=${INCLUDES} -pipe -Wall -Wunused -pedantic -ggdb -DDEBUG
-SUBDIRS=disttest
 PROTOCOL=dumb
-CORE=src/conn.o src/comm.o src/queue.o src/utils.o src/protocols/$(PROTOCOL).o
+INCLUDES=-Iinclude -Iinclude/protocols
+LDFLAGS=-lpthread -lm
+DEFINES=-DPROTO_H=\"${PROTOCOL}.h\" -DDEBUG
+CFLAGS=${INCLUDES} -O3 -pipe -Wall -ansi -pedantic -ggdb ${DEFINES}
+SUBDIRS=disttest tests
+CORE=src/conn.o src/comm.o src/queue.o src/timeval.o src/protocols/$(PROTOCOL).o
+SOURCES=src/*.c src/protocols/*.c include/*.h include/protocols/*.h
 EXECUTABLES=mlb flb
-UNITTESTS=initconn select queues memcpy
-.PHONY: clean cleanindent $(SUBDIRS)
+CC=@echo "Compiling $@ ...";cc
+LD=@echo "Linking $@ ...";cc
+.PHONY: clean cleanindent cleanplot cleansubdirs $(SUBDIRS)
 
 all: subdirs $(EXECUTABLES)
-
-utests: $(UNITTESTS)
-
+	@echo Done.
 subdirs: $(SUBDIRS)
 
 $(SUBDIRS):
@@ -20,32 +21,26 @@ $(SUBDIRS):
 %.c.o:
 
 mlb: $(CORE) src/mlb.o
-	${CC} ${LDFLAGS} $^ -o $@
+	${LD} ${LDFLAGS} $^ -o $@
+
 flb: $(CORE) src/flb.o
-	${CC} ${LDFLAGS} $^ -o $@
+	${LD} ${LDFLAGS} $^ -o $@
 
-initconn: $(CORE) utests/initconn.o
-	${CC} ${LDFLAGS} $^ -o $@
-
-select: $(CORE) utests/select.o
-	${CC} ${LDFLAGS} $^ -o $@
-
-queues: $(CORE) utests/queues.o
-	${CC} ${LDFLAGS} $^ -o $@
-
-memcpy: $(CORE) utests/memcpy.o
-	${CC} ${LDFLAGS} $^ -o $@
-
-
-
-
-#GNU indent only
 indent:
-	@if [ "`indent --version 2> /dev/null | cut -d' ' -f1 `" == "GNU" ]; then indent src/*.c include/*.h utests/*.c -i8 -bli0 -br -npsl -npcs; else echo "Sorry, GNU indent required!"; fi
+	@if which indent && \
+		[ "`indent --version 2> /dev/null | cut -d' ' -f1`" == "GNU" ];\
+	then indent ${SOURCES} -nhnl -nut -kr; \
+	else echo "Sorry, GNU indent required!"; fi
+
+cleanplot:
+	-rm *.png fit.log 2> /dev/null
+
 cleanindent:
-	-rm -f src/*.c~ src/protocols/*.c~ include/*.h~ utests/*.c~
-clean:	cleanindent
-	-rm -f core* *.stackdump delaymobile.txt delayfixed.txt
-	-rm -f $(EXECUTABLES) src/*.o src/protocols/*.o
-	-rm -f $(UNITTESTS) utests/*.o
-	$(MAKE) -C $(SUBDIRS) clean
+	-for i in ${SOURCES}; do rm -f $$i~ 2> /dev/null; done
+
+cleansubdirs:
+	-for i in $(SUBDIRS); do $(MAKE) -C "$${i}" clean; done
+
+clean:	cleansubdirs cleanindent cleanplot
+	-rm -f core* *.stackdump *.txt 2> /dev/null
+	-rm -f $(EXECUTABLES) src/*.o src/protocols/*.o 2> /dev/null

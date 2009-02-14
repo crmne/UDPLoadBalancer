@@ -1,30 +1,43 @@
 #include <err.h>
 #include <stdlib.h>
-#include "packet.h"
-#include "queue.h"
-#include "comm.h"
-#include "protocol.h"
+#include <string.h>
+#include "macro.h"
 
-int selectPath(config_t * config)
+int select_path(config_t * config)
 {
-	return config->socket[0];
+    return config->socket[0];
 }
 
-void manageMonAck(config_t * ack, packet_t * lastSent, packet_t * sendQueue)
+void manage_ack(config_t * ack, packet_t * lastSent)
 {
-	if (lastSent->id == ack->n) {
-		free(lastSent);
-	} else {
-		warnx("ACK %u, LASTSENT %u", ack->n, lastSent->id);
-		/*insertInQ(&sendQueue, lastSent); ?? */
-	}
+    free(lastSent);
 }
 
-void manageMonNack(config_t * nack, packet_t * lastSent, config_t * config)
+void manage_nack(config_t * nack, packet_t * lastSent, config_t * config)
 {
-	if (lastSent->id == nack->n) {
-		sendVoicePkts(selectPath(config), lastSent);
-	} else {
-		warnx("NACK %u, LASTSENT %u", nack->n, lastSent->id);
-	}
+    send_voice_pkts(select_path(config), lastSent);
+}
+
+unsigned int pa_cpy_to_pp(char *pp, struct packet_additions_t *pa)
+{
+    int i;
+    unsigned int n = pa->n == 0 ? 0 : sizeof(pa->n);
+    memcpy(pp, &pa->n, sizeof(pa->n));
+    for (i = 0; i < pa->n; i++) {
+        memcpy((char *) pp + n, &pa->port[i], sizeof(pa->port[i]));
+        n += sizeof(pa->port[i]);
+    }
+    return n;
+}
+
+unsigned int pa_cpy_from_pp(struct packet_additions_t *pa, char *pp)
+{
+    int i;
+    unsigned int n = pa->n == 0 ? 0 : sizeof(pa->n);
+    memcpy(&pa->n, pp, sizeof(pa->n));
+    for (i = 0; i < pa->n; i++) {
+        memcpy(&pa->port[i], (char *) pp + n, sizeof(pa->port[i]));
+        n += sizeof(pa->port[i]);
+    }
+    return n;
 }

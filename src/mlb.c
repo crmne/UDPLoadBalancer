@@ -1,128 +1,140 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <string.h>             /* memset */
 #include <err.h>
-#include <sys/select.h>
-#include <string.h>
-#include <netinet/in.h>
-#include <unistd.h>
+#include <stdlib.h>             /* malloc */
+#include <unistd.h>             /* close */
+#include <stdio.h>              /* printf, fflush -> DEBUG */
+#include "macro.h"
 
-#include "packet.h"
-#include "conn.h"
-#include "comm.h"
-#include "protocol.h"
-#include "utils.h"
+#define NFDS 4
+#define NPKTS 3
+#define NCFGS 3
+#define HOST "127.0.0.1"
+#define APP_PORT 6001
+#define PEER_PORT 7001
+#define MON_PORT 8000
+#define FIRST_PACKET_ID 9999
+#define MAX_RECVQ_LENGTH 2
+#define CFG_SEND_RETRY 2
 
-#define APPPORT 6001
-#define PEERPORT 7001
-#define MONPORT 8000
-
-void reconfigRoutes(config_t * oldcfg, config_t * newcfg, fd_set * fdset)
-{
-	struct sockaddr_in addr_in;
-	int i;
-	for (i = 0; i < oldcfg->n; i++) {
-		FD_CLR(oldcfg->socket[i], fdset);
-		close(oldcfg->socket[i]);
-	}
-	for (i = 0; i < newcfg->n; i++) {
-		newcfg->socket[i] = createSocket4(SOCK_DGRAM);
-		addr_in = setSocket4("127.0.0.1", newcfg->port[i]);
-		if (connect
-		    (newcfg->socket[i], (struct sockaddr *) &addr_in,
-		     sizeof(addr_in)) < 0)
-			err(1,
-			    "reconfigRoutes(...): connect(port=%d,socketfd=%d)",
-			    newcfg->port[i], newcfg->socket[i]);
-		else
-			FD_SET(newcfg->socket[i], fdset);
-	}
-}
-
+#define ERR_SELECT 1, "select()"
+#define ERR_MONPACK 2, "Monitor packet not understood"
+#define ERR_NOFDSET 3, "Incoming data, but in no controlled fd. Strange"
+typedef enum types {
+    mon, app, peer, path
+} types;
+typedef enum cfgn {
+    old, new, tmp
+} cfgn;
 int main(int argc, char *argv[])
 {
-	int retsel, maxfd;
-	char monAnswer;
-	uint32_t i, appPktId, peerPktId, expPktId = 0;
-	int monitorSock, appSock, peerSock;
-	config_t oldcfg, newcfg, tmpcfg;
-	packet_t nackPkt, *appPkt, *peerPkt, *recvQueue = NULL, *sendQueue =
-		NULL;
-	fd_set infds, allsetinfds, outfds, allsetoutfds;
+    int i, socks, maxfd, fd[NFDS], recvq_length, cfg_send_retry;
+    uint32_t expected_pkt;
+    packet_t *pkt[NPKTS], *recvq;
+    config_t cfg[NCFGS];
+    fd_set infds, allsetinfds;
 
-	memset(&newcfg, 0, sizeof(newcfg));
-	FD_ZERO(&allsetinfds);
-	FD_ZERO(&allsetoutfds);
+    expected_pkt = FIRST_PACKET_ID;
 
-	monitorSock = connectToMon(MONPORT);
-	FD_SET(monitorSock, &allsetinfds);
+    recvq = NULL;
+    recvq_length = 0;
+    cfg_send_retry = 0;
 
-	appSock = acceptFromApp(listenFromApp(APPPORT));
-	FD_SET(appSock, &allsetinfds);
-	FD_SET(appSock, &allsetoutfds);
+    for (i = 0; i < NPKTS; i++)
+        pkt[i] = NULL;
 
-	peerSock = listenUDP4(PEERPORT);
-	FD_SET(peerSock, &allsetinfds);
+    for (i = 0; i < NCFGS; i++)
+        memset(&cfg[i], 0, sizeof(cfg[i]));
 
-	maxfd = peerSock;
+    FD_ZERO(&allsetinfds);
 
-	while (1) {
-		infds = allsetinfds;
-		outfds = allsetoutfds;
-		retsel = select(maxfd + 1, &infds, &outfds, NULL, NULL);
-		if (retsel > 0) {
-			if (FD_ISSET(monitorSock, &infds)) {
-				monAnswer =
-					recvMonitorPkts(monitorSock, &tmpcfg);
-				switch (monAnswer) {
-				case 'A':
-					manageMonAck(&tmpcfg, appPkt,
-						     sendQueue);
-					break;
-				case 'N':
-					manageMonNack(&tmpcfg, appPkt,
-						      &newcfg);
-					break;
-				case 'C':
-					oldcfg = newcfg;
-					newcfg = tmpcfg;
-					reconfigRoutes(&oldcfg, &newcfg,
-						       &allsetoutfds);
-					break;
-				}
-			}
-			if (FD_ISSET(appSock, &infds)) {
-				appPkt = (packet_t *)
-					malloc(sizeof(packet_t));
-				appPkt->numfail = nackPkt.numfail;
-				memcpy(&appPkt->failid, &nackPkt.failid,
-				       sizeof(nackPkt.failid));
-				appPktId = recvVoicePkts(appSock, appPkt);
-				sendVoicePkts(selectPath(&newcfg), appPkt);
-			}
-			if (FD_ISSET(peerSock, &infds)) {
-				peerPkt =
-					(packet_t *) malloc(sizeof(packet_t));
-				peerPktId = recvVoicePkts(peerSock, peerPkt);
-				if (FD_ISSET(appSock, &outfds)) {
-					expPktId +=
-						sendPktsToApp(appSock,
-							      peerPkt,
-							      recvQueue,
-							      expPktId);
-					nackPkt.numfail =
-						peerPktId - expPktId;
-				}
-				else
-					err(132, "App socket not ready!");
-				for (i = expPktId; i < peerPktId; i++) {
-					nackPkt.failid[i - expPktId] = i;
-				}
-				warnx("expPktId=%u", expPktId);
-			}
-		}
-		else {
-			err(1, "select()");
-		}
-	}
-	return 127;		/* we mustn't reach this point! */
+    fd[mon] = connect_mon(HOST, MON_PORT);
+    FD_SET(fd[mon], &allsetinfds);
+
+    fd[app] = accept_app(listen_app(HOST, APP_PORT));
+    FD_SET(fd[app], &allsetinfds);
+
+    fd[peer] = listen_udp(HOST, PEER_PORT);
+    FD_SET(fd[peer], &allsetinfds);
+
+    maxfd = fd[peer];
+
+    for (;;) {
+        infds = allsetinfds;
+        socks = select(maxfd + 1, &infds, NULL, NULL, NULL);
+        if (socks <= 0)
+            err(ERR_SELECT);
+        if (recvq_length >= MAX_RECVQ_LENGTH) {
+            while (recvq_length > 0) {
+                packet_t *a_pack = q_extract_first(&recvq);
+                recvq_length--;
+                send_voice_pkts(fd[app], a_pack);
+                expected_pkt = a_pack->id + 1;
+                free(a_pack);
+            }
+        }
+        while (socks > 0) {
+            if (FD_ISSET(fd[mon], &infds)) {
+                char answ = recv_mon(fd[mon], &cfg[tmp]);
+
+                switch (answ) {
+                case 'A':
+                    manage_ack(&cfg[tmp], pkt[app]);
+                    warnx("ACK");
+                    break;
+                case 'N':
+                    manage_nack(&cfg[tmp], pkt[app], &cfg[new]);
+                    warnx("NACK");
+                    break;
+                case 'C':
+                    cfg[old] = cfg[new];
+                    cfg[new] = cfg[tmp];
+                    reconf_routes(&cfg[old], &cfg[new]);
+                    cfg_send_retry = CFG_SEND_RETRY;
+                    break;
+                default:
+                    errx(ERR_MONPACK);
+                }
+
+                FD_CLR(fd[mon], &infds);
+            } else if (FD_ISSET(fd[app], &infds)) {
+                pkt[app] = (packet_t *) malloc(sizeof(packet_t));
+                pkt[app]->pa.n = 0;
+                recv_voice_pkts(fd[app], pkt[app]);
+
+                fd[path] = select_path(&cfg[new]);
+                /* select path */
+                /*fd[path] =
+                   cfg[new].
+                   socket[(((pkt[app]->id / (25 / cfg[new].n)) - 1 ) %
+                   cfg[new].n)]; */
+                if (cfg_send_retry > 0) {
+                    cfg_send_retry--;
+                    pkt[app]->pa.n = cfg[new].n;
+                    memcpy(pkt[app]->pa.port, cfg[new].port,
+                           sizeof(cfg[new].port));
+                }
+                send_voice_pkts(fd[path], pkt[app]);
+                FD_CLR(fd[app], &infds);
+            } else if (FD_ISSET(fd[peer], &infds)) {
+                uint32_t pktid;
+
+                pkt[peer] = (packet_t *) malloc(sizeof(packet_t));
+                pkt[peer]->pa.n = 0;
+                pktid = recv_voice_pkts(fd[peer], pkt[peer]);
+                if (pktid == expected_pkt) {
+                    send_voice_pkts(fd[app], pkt[peer]);
+                    free(pkt[peer]);
+                    expected_pkt++;
+                } else if (pktid > expected_pkt) {
+                    q_insert(&recvq, pkt[peer]);
+                    recvq_length++;
+                }
+                warnx("pktid %u, expected_pkt %u", pktid, expected_pkt);
+                FD_CLR(fd[peer], &infds);
+            } else
+                errx(ERR_NOFDSET);
+            socks--;
+        }
+    }
+    return 0;
 }
