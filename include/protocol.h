@@ -8,8 +8,8 @@
 int select_path(config_t *);
 void manage_ack(config_t *, packet_t *);
 void manage_nack(config_t *, packet_t *, config_t *);
-void pa_cpy_to_pp(char *, struct packet_additions_t *);
-void pa_cpy_from_pp(struct packet_additions_t *, char *);
+unsigned int pa_cpy_to_pp(char *, struct packet_additions_t *);
+unsigned int pa_cpy_from_pp(struct packet_additions_t *, char *);
 void is_not_exp_pkt(packet_t *, uint32_t);
 
 #else

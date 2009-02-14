@@ -29,7 +29,7 @@ flb: $(CORE) src/flb.o
 indent:
 	@if which indent && \
 		[ "`indent --version 2> /dev/null | cut -d' ' -f1`" == "GNU" ];\
-	then indent ${SOURCES} -kr -nhnl -nut; \
+	then indent ${SOURCES} -nhnl -nut -kr; \
 	else echo "Sorry, GNU indent required!"; fi
 
 cleanplot:

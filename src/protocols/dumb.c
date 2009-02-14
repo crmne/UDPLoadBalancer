@@ -3,8 +3,6 @@
 #include <string.h>
 #include "macro.h"
 
-struct packet_additions_t next_pa;
-
 int select_path(config_t * config)
 {
     return config->socket[0];
@@ -12,36 +10,34 @@ int select_path(config_t * config)
 
 void manage_ack(config_t * ack, packet_t * lastSent)
 {
-    if (lastSent->id == ack->n) {
-        free(lastSent);
-    } else {
-        warnx("ACK %u, LASTSENT %u", ack->n, lastSent->id);
-        /* q_insert(&sendQueue, lastSent); ?? */
-    }
+    free(lastSent);
 }
 
 void manage_nack(config_t * nack, packet_t * lastSent, config_t * config)
 {
-    if (lastSent->id == nack->n) {
-        send_voice_pkts(select_path(config), lastSent);
-    } else {
-        warnx("NACK %u, LASTSENT %u", nack->n, lastSent->id);
+    send_voice_pkts(select_path(config), lastSent);
+}
+
+unsigned int pa_cpy_to_pp(char *pp, struct packet_additions_t *pa)
+{
+    int i;
+    unsigned int n = pa->n == 0 ? 0 : sizeof(pa->n);
+    memcpy(pp, &pa->n, sizeof(pa->n));
+    for (i = 0; i < pa->n; i++) {
+        memcpy((char *) pp + n, &pa->port[i], sizeof(pa->port[i]));
+        n += sizeof(pa->port[i]);
     }
+    return n;
 }
 
-void pa_cpy_to_pp(char *pp, struct packet_additions_t *pa)
+unsigned int pa_cpy_from_pp(struct packet_additions_t *pa, char *pp)
 {
-    memcpy(pp, &next_pa, sizeof(next_pa));
-}
-
-void pa_cpy_from_pp(struct packet_additions_t *pa, char *pp)
-{
-    memcpy(pa, pp, sizeof(pa));
-    if (pa->ack_prev_p == 'N')
-        warnx("PROTO: NACK");
-}
-
-void is_not_exp_pkt(packet_t * packet, uint32_t exp_id)
-{
-    next_pa.ack_prev_p = 'N';
+    int i;
+    unsigned int n = pa->n == 0 ? 0 : sizeof(pa->n);
+    memcpy(&pa->n, pp, sizeof(pa->n));
+    for (i = 0; i < pa->n; i++) {
+        memcpy(&pa->port[i], (char *) pp + n, sizeof(pa->port[i]));
+        n += sizeof(pa->port[i]);
+    }
+    return n;
 }

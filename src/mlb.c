@@ -13,6 +13,8 @@
 #define PEER_PORT 7001
 #define MON_PORT 8000
 #define FIRST_PACKET_ID 9999
+#define MAX_RECVQ_LENGTH 2
+#define CFG_SEND_RETRY 2
 
 #define ERR_SELECT 1, "select()"
 #define ERR_MONPACK 2, "Monitor packet not understood"
@@ -25,7 +27,7 @@ typedef enum cfgn {
 } cfgn;
 int main(int argc, char *argv[])
 {
-    int i, socks, maxfd, fd[NFDS];
+    int i, socks, maxfd, fd[NFDS], recvq_length, cfg_send_retry;
     uint32_t expected_pkt;
     packet_t *pkt[NPKTS], *recvq;
     config_t cfg[NCFGS];
@@ -34,6 +36,8 @@ int main(int argc, char *argv[])
     expected_pkt = FIRST_PACKET_ID;
 
     recvq = NULL;
+    recvq_length = 0;
+    cfg_send_retry = 0;
 
     for (i = 0; i < NPKTS; i++)
         pkt[i] = NULL;
@@ -59,6 +63,15 @@ int main(int argc, char *argv[])
         socks = select(maxfd + 1, &infds, NULL, NULL, NULL);
         if (socks <= 0)
             err(ERR_SELECT);
+        if (recvq_length >= MAX_RECVQ_LENGTH) {
+            while (recvq_length > 0) {
+                packet_t *a_pack = q_extract_first(&recvq);
+                recvq_length--;
+                send_voice_pkts(fd[app], a_pack);
+                expected_pkt = a_pack->id + 1;
+                free(a_pack);
+            }
+        }
         while (socks > 0) {
             if (FD_ISSET(fd[mon], &infds)) {
                 char answ = recv_mon(fd[mon], &cfg[tmp]);
@@ -76,6 +89,7 @@ int main(int argc, char *argv[])
                     cfg[old] = cfg[new];
                     cfg[new] = cfg[tmp];
                     reconf_routes(&cfg[old], &cfg[new]);
+                    cfg_send_retry = CFG_SEND_RETRY;
                     break;
                 default:
                     errx(ERR_MONPACK);
@@ -84,22 +98,36 @@ int main(int argc, char *argv[])
                 FD_CLR(fd[mon], &infds);
             } else if (FD_ISSET(fd[app], &infds)) {
                 pkt[app] = (packet_t *) malloc(sizeof(packet_t));
+                pkt[app]->pa.n = 0;
                 recv_voice_pkts(fd[app], pkt[app]);
 
                 fd[path] = select_path(&cfg[new]);
                 /* select path */
-                /*fd[path] = cfg[new].socket[(((pkt[app]->id / (25 / cfg[new].n)) - 1 ) % cfg[new].n)]; */
-
+                /*fd[path] =
+                   cfg[new].
+                   socket[(((pkt[app]->id / (25 / cfg[new].n)) - 1 ) %
+                   cfg[new].n)]; */
+                if (cfg_send_retry > 0) {
+                    cfg_send_retry--;
+                    pkt[app]->pa.n = cfg[new].n;
+                    memcpy(pkt[app]->pa.port, cfg[new].port,
+                           sizeof(cfg[new].port));
+                }
                 send_voice_pkts(fd[path], pkt[app]);
                 FD_CLR(fd[app], &infds);
             } else if (FD_ISSET(fd[peer], &infds)) {
                 uint32_t pktid;
 
                 pkt[peer] = (packet_t *) malloc(sizeof(packet_t));
+                pkt[peer]->pa.n = 0;
                 pktid = recv_voice_pkts(fd[peer], pkt[peer]);
-                if (pktid >= expected_pkt) {
+                if (pktid == expected_pkt) {
                     send_voice_pkts(fd[app], pkt[peer]);
-                    expected_pkt = pktid + 1;
+                    free(pkt[peer]);
+                    expected_pkt++;
+                } else if (pktid > expected_pkt) {
+                    q_insert(&recvq, pkt[peer]);
+                    recvq_length++;
                 }
                 warnx("pktid %u, expected_pkt %u", pktid, expected_pkt);
                 FD_CLR(fd[peer], &infds);
