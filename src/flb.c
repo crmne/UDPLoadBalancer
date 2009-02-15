@@ -60,11 +60,12 @@ int main(int argc, char *argv[])
             }
         }
         while (socks > 0) {
+            socks--;
             if (FD_ISSET(fd[peer], &infds)) {
                 uint32_t pktid;
 
-                pkt[peer] = (packet_t *) malloc(sizeof(packet_t));
-                pkt[peer]->pa.n = 0;
+                pkt[peer] = (packet_t *) calloc(1, sizeof(packet_t));
+                /*pkt[peer]->pa.n = 0; */
                 pktid = recv_voice_pkts(fd[peer], pkt[peer]);
                 if (pktid == expected_pkt) {
                     send_voice_pkts(fd[app], pkt[peer]);
@@ -77,14 +78,13 @@ int main(int argc, char *argv[])
                 warnx("pktid %u, expected_pkt %u", pktid, expected_pkt);
                 FD_CLR(fd[peer], &infds);
             } else if (FD_ISSET(fd[app], &infds)) {
-                pkt[app] = (packet_t *) malloc(sizeof(packet_t));
-                pkt[app]->pa.n = 0;
+                pkt[app] = (packet_t *) calloc(1, sizeof(packet_t));
+                /*pkt[app]->pa.n = 0; */
                 recv_voice_pkts(fd[app], pkt[app]);
                 send_voice_pkts(fd[path], pkt[app]);
                 FD_CLR(fd[app], &infds);
             } else
                 errx(ERR_NOFDSET);
-            socks--;
         }
     }
     return 0;
