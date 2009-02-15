@@ -42,8 +42,11 @@ int main(int argc, char *argv[])
     for (i = 0; i < NPKTS; i++)
         pkt[i] = NULL;
 
-    for (i = 0; i < NCFGS; i++)
-        memset(&cfg[i], 0, sizeof(cfg[i]));
+    for (i = 0; i < NCFGS; i++) {
+        cfg[i].type = 0;
+        cfg[i].n = 0;
+    }
+
 
     FD_ZERO(&allsetinfds);
 
@@ -89,7 +92,7 @@ int main(int argc, char *argv[])
                 case 'C':
                     cfg[old] = cfg[new];
                     cfg[new] = cfg[tmp];
-                    reconf_routes(&cfg[old], &cfg[new]);
+                    reconf_routes(&cfg[old], &cfg[new], 0);
                     cfg_send_retry = CFG_SEND_RETRY;
                     break;
                 default:
@@ -111,6 +114,7 @@ int main(int argc, char *argv[])
                 if (cfg_send_retry > 0) {
                     cfg_send_retry--;
                     pkt[app]->pa.n = cfg[new].n;
+                    warnx("cfg new n = %u", cfg[new].n);
                     memcpy(pkt[app]->pa.port, cfg[new].port,
                            sizeof(cfg[new].port));
                 }

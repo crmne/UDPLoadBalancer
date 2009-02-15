@@ -2,7 +2,7 @@ PROTOCOL=dumb
 INCLUDES=-Iinclude -Iinclude/protocols
 LDFLAGS=-lpthread -lm
 DEFINES=-DPROTO_H=\"${PROTOCOL}.h\" -DDEBUG
-CFLAGS=${INCLUDES} -O3 -pipe -Wall -ansi -pedantic -ggdb ${DEFINES}
+CFLAGS=${INCLUDES} -O3 -pipe -Wall -Werror -ansi -pedantic -ggdb ${DEFINES}
 SUBDIRS=disttest tests
 CORE=src/conn.o src/comm.o src/queue.o src/timeval.o src/protocols/$(PROTOCOL).o
 SOURCES=src/*.c src/protocols/*.c include/*.h include/protocols/*.h

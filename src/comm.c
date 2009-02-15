@@ -9,7 +9,8 @@
 
 #include "macro.h"
 
-void reconf_routes(config_t * oldcfg, config_t * newcfg)
+void reconf_routes(config_t * oldcfg, config_t * newcfg,
+                   const unsigned int offset)
 {
     int i;
 
@@ -20,7 +21,8 @@ void reconf_routes(config_t * oldcfg, config_t * newcfg)
     }
 
     for (i = 0; i < newcfg->n; i++) {
-        newcfg->socket[i] = connect_udp("127.0.0.1", newcfg->port[i]);
+        newcfg->socket[i] =
+            connect_udp("127.0.0.1", newcfg->port[i] + offset);
         printf(" %u", newcfg->port[i]);
     }
 
@@ -51,9 +53,9 @@ uint32_t recv_voice_pkts(int socketfd, packet_t * packet)
 {
     int n;
     unsigned int size = 0;
-    char ppacket[PACKET_SIZE];
+    char ppacket[PACKET_SIZE + sizeof(packet->pa)];
 
-    n = read(socketfd, &ppacket, sizeof(ppacket) + sizeof(packet->pa));
+    n = read(socketfd, &ppacket, sizeof(ppacket));
     if (n == 0)
         errx(2, "Nothing received, maybe the other end is down? Exiting.");
 /*    if (n != sizeof(ppacket) + sizeof(packet->pa))
@@ -85,7 +87,7 @@ void send_voice_pkts(int socketfd, packet_t * packet)
 {
     int n;
     unsigned int size = 0;
-    char ppacket[PACKET_SIZE];
+    char ppacket[PACKET_SIZE + sizeof(packet->pa)];
 
     memcpy(&ppacket, &packet->id, sizeof(packet->id));
     size += sizeof(packet->id);

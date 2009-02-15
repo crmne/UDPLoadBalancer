@@ -5,6 +5,7 @@
 
 #define NFDS 3
 #define NPKTS 2
+#define NCFGS 3
 #define HOST "127.0.0.1"
 #define APP_PORT 11001
 #define PEER_PORT 10001
@@ -18,11 +19,15 @@
 typedef enum types {
     app, peer, path
 } types;
+typedef enum cfgn {
+    old, new, tmp
+} cfgn;
 int main(int argc, char *argv[])
 {
     int i, socks, maxfd, fd[NFDS], recvq_length;
     uint32_t expected_pkt;
     packet_t *pkt[NPKTS], *recvq;
+    config_t cfg[NCFGS];
     fd_set infds, allsetinfds;
 
     expected_pkt = FIRST_PACKET_ID;
@@ -33,6 +38,12 @@ int main(int argc, char *argv[])
     for (i = 0; i < NPKTS; i++)
         pkt[i] = NULL;
 
+    for (i = 0; i < NCFGS; i++) {
+        cfg[i].type = 0;
+        cfg[i].n = 0;
+    }
+
+
     FD_ZERO(&allsetinfds);
 
     fd[app] = accept_app(listen_app(HOST, APP_PORT));
@@ -40,8 +51,6 @@ int main(int argc, char *argv[])
 
     fd[peer] = listen_udp(HOST, PEER_PORT);
     FD_SET(fd[peer], &allsetinfds);
-
-    fd[path] = connect_udp(HOST, PATH_PORT);
 
     maxfd = fd[peer];
 
@@ -65,8 +74,16 @@ int main(int argc, char *argv[])
                 uint32_t pktid;
 
                 pkt[peer] = (packet_t *) calloc(1, sizeof(packet_t));
-                /*pkt[peer]->pa.n = 0; */
                 pktid = recv_voice_pkts(fd[peer], pkt[peer]);
+                if (pkt[peer]->pa.n > 0) {
+                    cfg[tmp].n = pkt[peer]->pa.n;
+                    memcpy(&cfg[tmp].port, &pkt[peer]->pa.port,
+                           sizeof(cfg[tmp].port));
+                    cfg[old] = cfg[new];
+                    cfg[new] = cfg[tmp];
+                    reconf_routes(&cfg[old], &cfg[new], 1000);
+                    pkt[peer]->pa.n = 0;
+                }
                 if (pktid == expected_pkt) {
                     send_voice_pkts(fd[app], pkt[peer]);
                     free(pkt[peer]);
@@ -81,6 +98,8 @@ int main(int argc, char *argv[])
                 pkt[app] = (packet_t *) calloc(1, sizeof(packet_t));
                 /*pkt[app]->pa.n = 0; */
                 recv_voice_pkts(fd[app], pkt[app]);
+                fd[path] = select_path(&cfg[new]);
+
                 send_voice_pkts(fd[path], pkt[app]);
                 FD_CLR(fd[app], &infds);
             } else

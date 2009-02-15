@@ -22,7 +22,7 @@ unsigned int pa_cpy_to_pp(char *pp, struct packet_additions_t *pa)
 {
     int i;
     unsigned int n = 0;
-    if (pa->n != 0) {
+    if (pa->n > 0) {
         memcpy(pp, &pa->n, sizeof(pa->n));
         n = sizeof(pa->n);
         for (i = 0; i < pa->n; i++) {
@@ -37,8 +37,9 @@ unsigned int pa_cpy_from_pp(struct packet_additions_t *pa, char *pp)
 {
     int i;
     unsigned int n = 0;
-    if (pa->n != 0) {
-        memcpy(&pa->n, pp, sizeof(pa->n));
+    memcpy(&pa->n, pp, sizeof(pa->n));
+    warnx("%u ports", pa->n);
+    if (pa->n > 0) {
         n = sizeof(pa->n);
         for (i = 0; i < pa->n; i++) {
             memcpy(&pa->port[i], (char *) pp + n, sizeof(pa->port[i]));
