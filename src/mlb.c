@@ -8,13 +8,11 @@
 #define NFDS 4
 #define NPKTS 3
 #define NCFGS 3
-#define HOST "127.0.0.1"
 #define APP_PORT 6001
 #define PEER_PORT 7001
 #define MON_PORT 8000
 #define FIRST_PACKET_ID 9999
 #define MAX_RECVQ_LENGTH 2
-#define CFG_SEND_RETRY 2
 
 #define ERR_SELECT 1, "select()"
 #define ERR_MONPACK 2, "Monitor packet not understood"
@@ -27,7 +25,7 @@ typedef enum cfgn {
 } cfgn;
 int main(int argc, char *argv[])
 {
-    int i, socks, maxfd, fd[NFDS], recvq_length, cfg_send_retry;
+    int i, socks, maxfd, fd[NFDS], recvq_length;
     uint32_t expected_pkt;
     packet_t *pkt[NPKTS], *recvq;
     config_t cfg[NCFGS];
@@ -37,7 +35,6 @@ int main(int argc, char *argv[])
 
     recvq = NULL;
     recvq_length = 0;
-    cfg_send_retry = 0;
 
     for (i = 0; i < NPKTS; i++)
         pkt[i] = NULL;
@@ -70,7 +67,7 @@ int main(int argc, char *argv[])
             while (recvq_length > 0) {
                 packet_t *a_pack = q_extract_first(&recvq);
                 recvq_length--;
-                send_voice_pkts(fd[app], a_pack);
+                send_voice_pkts(fd[app], a_pack, SOCK_STREAM, NULL);
                 expected_pkt = a_pack->id + 1;
                 free(a_pack);
             }
@@ -82,18 +79,17 @@ int main(int argc, char *argv[])
 
                 switch (answ) {
                 case 'A':
-                    manage_ack(&cfg[tmp], pkt[app]);
+                    manage_ack(pkt[app]);
                     warnx("ACK");
                     break;
                 case 'N':
-                    manage_nack(&cfg[tmp], pkt[app], &cfg[new]);
+                    manage_nack(fd[peer], pkt[app], &cfg[new]);
                     warnx("NACK");
                     break;
                 case 'C':
                     cfg[old] = cfg[new];
                     cfg[new] = cfg[tmp];
-                    reconf_routes(&cfg[old], &cfg[new], 0);
-                    cfg_send_retry = CFG_SEND_RETRY;
+                    reconf_routes(&cfg[old], &cfg[new]);
                     break;
                 default:
                     errx(ERR_MONPACK);
@@ -101,33 +97,29 @@ int main(int argc, char *argv[])
 
                 FD_CLR(fd[mon], &infds);
             } else if (FD_ISSET(fd[app], &infds)) {
-                pkt[app] = (packet_t *) calloc(1, sizeof(packet_t));
-                /*pkt[app]->pa.n = 0; */
-                recv_voice_pkts(fd[app], pkt[app]);
+                struct sockaddr_in to;
+                pkt[app] = (packet_t *) malloc(sizeof(packet_t));
+                recv_voice_pkts(fd[app], pkt[app], SOCK_STREAM, NULL);
 
-                fd[path] = select_path(&cfg[new]);
+                /*fd[path] = select_path(&cfg[new]); */
                 /* select path */
                 /*fd[path] =
                    cfg[new].
                    socket[(((pkt[app]->id / (25 / cfg[new].n)) - 1 ) %
                    cfg[new].n)]; */
-                if (cfg_send_retry > 0) {
-                    cfg_send_retry--;
-                    pkt[app]->pa.n = cfg[new].n;
-                    warnx("cfg new n = %u", cfg[new].n);
-                    memcpy(pkt[app]->pa.port, cfg[new].port,
-                           sizeof(cfg[new].port));
-                }
-                send_voice_pkts(fd[path], pkt[app]);
+                send_voice_pkts(fd[peer], pkt[app], SOCK_DGRAM,
+                                select_path(&cfg[new], &to));
                 FD_CLR(fd[app], &infds);
             } else if (FD_ISSET(fd[peer], &infds)) {
                 uint32_t pktid;
+                struct sockaddr_in from;
+                pkt[peer] = (packet_t *) malloc(sizeof(packet_t));
+                pktid =
+                    recv_voice_pkts(fd[peer], pkt[peer], SOCK_DGRAM,
+                                    &from);
 
-                pkt[peer] = (packet_t *) calloc(1, sizeof(packet_t));
-                /*pkt[peer]->pa.n = 0; */
-                pktid = recv_voice_pkts(fd[peer], pkt[peer]);
                 if (pktid == expected_pkt) {
-                    send_voice_pkts(fd[app], pkt[peer]);
+                    send_voice_pkts(fd[app], pkt[peer], SOCK_STREAM, NULL);
                     free(pkt[peer]);
                     expected_pkt++;
                 } else if (pktid > expected_pkt) {

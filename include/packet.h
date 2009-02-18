@@ -9,7 +9,6 @@ typedef struct {
     char type;
     uint32_t n;
     uint16_t port[MAX_PATHS];
-    int socket[MAX_PATHS];
 } config_t;
 
 typedef struct {

@@ -5,6 +5,7 @@
 #ifndef NULL
 #define NULL (void *) 0
 #endif
+#define HOST "127.0.0.1"
 #define MAX_CONNS 1
 #define MAX_PATHS 3
 #define MAX_DELAY 150000

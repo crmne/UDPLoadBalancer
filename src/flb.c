@@ -5,8 +5,6 @@
 
 #define NFDS 3
 #define NPKTS 2
-#define NCFGS 3
-#define HOST "127.0.0.1"
 #define APP_PORT 11001
 #define PEER_PORT 10001
 #define PATH_PORT 9001
@@ -19,15 +17,12 @@
 typedef enum types {
     app, peer, path
 } types;
-typedef enum cfgn {
-    old, new, tmp
-} cfgn;
 int main(int argc, char *argv[])
 {
     int i, socks, maxfd, fd[NFDS], recvq_length;
     uint32_t expected_pkt;
+    struct sockaddr_in from;
     packet_t *pkt[NPKTS], *recvq;
-    config_t cfg[NCFGS];
     fd_set infds, allsetinfds;
 
     expected_pkt = FIRST_PACKET_ID;
@@ -37,12 +32,6 @@ int main(int argc, char *argv[])
 
     for (i = 0; i < NPKTS; i++)
         pkt[i] = NULL;
-
-    for (i = 0; i < NCFGS; i++) {
-        cfg[i].type = 0;
-        cfg[i].n = 0;
-    }
-
 
     FD_ZERO(&allsetinfds);
 
@@ -63,7 +52,7 @@ int main(int argc, char *argv[])
             while (recvq_length > 0) {
                 packet_t *a_pack = q_extract_first(&recvq);
                 recvq_length--;
-                send_voice_pkts(fd[app], a_pack);
+                send_voice_pkts(fd[app], a_pack, SOCK_STREAM, NULL);
                 expected_pkt = a_pack->id + 1;
                 free(a_pack);
             }
@@ -72,20 +61,13 @@ int main(int argc, char *argv[])
             socks--;
             if (FD_ISSET(fd[peer], &infds)) {
                 uint32_t pktid;
+                pkt[peer] = (packet_t *) malloc(sizeof(packet_t));
+                pktid =
+                    recv_voice_pkts(fd[peer], pkt[peer], SOCK_DGRAM,
+                                    &from);
 
-                pkt[peer] = (packet_t *) calloc(1, sizeof(packet_t));
-                pktid = recv_voice_pkts(fd[peer], pkt[peer]);
-                if (pkt[peer]->pa.n > 0) {
-                    cfg[tmp].n = pkt[peer]->pa.n;
-                    memcpy(&cfg[tmp].port, &pkt[peer]->pa.port,
-                           sizeof(cfg[tmp].port));
-                    cfg[old] = cfg[new];
-                    cfg[new] = cfg[tmp];
-                    reconf_routes(&cfg[old], &cfg[new], 1000);
-                    pkt[peer]->pa.n = 0;
-                }
                 if (pktid == expected_pkt) {
-                    send_voice_pkts(fd[app], pkt[peer]);
+                    send_voice_pkts(fd[app], pkt[peer], SOCK_STREAM, NULL);
                     free(pkt[peer]);
                     expected_pkt++;
                 } else if (pktid > expected_pkt) {
@@ -95,12 +77,10 @@ int main(int argc, char *argv[])
                 warnx("pktid %u, expected_pkt %u", pktid, expected_pkt);
                 FD_CLR(fd[peer], &infds);
             } else if (FD_ISSET(fd[app], &infds)) {
-                pkt[app] = (packet_t *) calloc(1, sizeof(packet_t));
-                /*pkt[app]->pa.n = 0; */
-                recv_voice_pkts(fd[app], pkt[app]);
-                fd[path] = select_path(&cfg[new]);
+                pkt[app] = (packet_t *) malloc(sizeof(packet_t));
+                recv_voice_pkts(fd[app], pkt[app], SOCK_STREAM, NULL);
 
-                send_voice_pkts(fd[path], pkt[app]);
+                send_voice_pkts(fd[peer], pkt[app], SOCK_DGRAM, &from);
                 FD_CLR(fd[app], &infds);
             } else
                 errx(ERR_NOFDSET);

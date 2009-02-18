@@ -1,21 +1,27 @@
 #include <err.h>
 #include <stdlib.h>
 #include <string.h>
+#include <arpa/inet.h>
 #include "macro.h"
 
-int select_path(config_t * config)
+struct sockaddr_in *select_path(config_t * config, struct sockaddr_in *to)
 {
-    return config->socket[0];
+    to->sin_family = AF_INET;
+    to->sin_addr.s_addr = inet_addr(HOST);
+    to->sin_port = htons(config->port[0]);
+    return to;
 }
 
-void manage_ack(config_t * ack, packet_t * lastSent)
+void manage_ack(packet_t * lastSent)
 {
     free(lastSent);
 }
 
-void manage_nack(config_t * nack, packet_t * lastSent, config_t * config)
+void manage_nack(int socketfd, packet_t * lastSent, config_t * config)
 {
-    send_voice_pkts(select_path(config), lastSent);
+    struct sockaddr_in to;
+    send_voice_pkts(socketfd, lastSent, SOCK_DGRAM,
+                    select_path(config, &to));
 }
 
 unsigned int pa_cpy_to_pp(char *pp, struct packet_additions_t *pa)

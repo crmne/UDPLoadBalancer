@@ -9,20 +9,13 @@
 
 #include "macro.h"
 
-void reconf_routes(config_t * oldcfg, config_t * newcfg,
-                   const unsigned int offset)
+void reconf_routes(config_t * oldcfg, config_t * newcfg)
 {
     int i;
 
     printf("New Config!");
 
-    for (i = 0; i < oldcfg->n; i++) {
-        close(oldcfg->socket[i]);
-    }
-
     for (i = 0; i < newcfg->n; i++) {
-        newcfg->socket[i] =
-            connect_udp("127.0.0.1", newcfg->port[i] + offset);
         printf(" %u", newcfg->port[i]);
     }
 
@@ -49,18 +42,32 @@ int get_local_port(int socketfd)
     return (ntohs(local.sin_port));
 }
 
-uint32_t recv_voice_pkts(int socketfd, packet_t * packet)
+uint32_t recv_voice_pkts(int socketfd, packet_t * packet, int type,
+                         struct sockaddr_in * from)
 {
-    int n;
-    unsigned int size = 0;
-    char ppacket[PACKET_SIZE + sizeof(packet->pa)];
+    int n = 0;
+    unsigned int size = 0, len = sizeof(struct sockaddr_in);
+    char ppacket[PACKET_SIZE];
 
-    n = read(socketfd, &ppacket, sizeof(ppacket));
+    memset(&ppacket, 0, sizeof(ppacket));
+    memset(packet, 0, sizeof(packet_t));
+
+    switch (type) {
+    case SOCK_STREAM:
+        n = read(socketfd, &ppacket, sizeof(ppacket));
+        break;
+    case SOCK_DGRAM:
+        n = recvfrom(socketfd, &ppacket, sizeof(ppacket), 0,
+                     (struct sockaddr *) from, &len);
+        break;
+    default:
+        errx(10, "Invalid protocol");
+    }
     if (n == 0)
         errx(2, "Nothing received, maybe the other end is down? Exiting.");
-/*    if (n != sizeof(ppacket) + sizeof(packet->pa))
-        err(1, "recv_voice_pkts(socketfd=%d,...): read(packet)=%d",
-            socketfd, n);*/
+    if (n != sizeof(ppacket))
+        err(1, "recv_voice_pkts(socketfd=%d,...): read %d bytes", socketfd,
+            n);
 
     memcpy(&packet->id, &ppacket, sizeof(packet->id));
     size += sizeof(packet->id);
@@ -69,25 +76,24 @@ uint32_t recv_voice_pkts(int socketfd, packet_t * packet)
     memcpy(&packet->data, (char *) &ppacket + size, sizeof(packet->data));
     size += sizeof(packet->data);
 
-    if (n > size)
-        size += pa_cpy_from_pp(&packet->pa, (char *) &ppacket + size);
-
-    packet->next = NULL;
 #ifdef DEBUG
     printf
         ("Received voice packet %u from %d, size = %u, delay = %u usec\n",
-         packet->id, get_local_port(socketfd), size,
+         packet->id, type == SOCK_DGRAM ? htons(from->sin_port) : 0, size,
          timeval_age(&packet->time));
     fflush(stdout);
 #endif
     return packet->id;
 }
 
-void send_voice_pkts(int socketfd, packet_t * packet)
+void send_voice_pkts(int socketfd, packet_t * packet, int type,
+                     struct sockaddr_in *to)
 {
-    int n;
+    int n = 0;
     unsigned int size = 0;
-    char ppacket[PACKET_SIZE + sizeof(packet->pa)];
+    char ppacket[PACKET_SIZE];
+
+    memset(&ppacket, 0, sizeof(ppacket));
 
     memcpy(&ppacket, &packet->id, sizeof(packet->id));
     size += sizeof(packet->id);
@@ -96,15 +102,24 @@ void send_voice_pkts(int socketfd, packet_t * packet)
     memcpy((char *) &ppacket + size, &packet->data, sizeof(packet->data));
     size += sizeof(packet->data);
 
-    if (packet->pa.n > 0)
-        size += pa_cpy_to_pp((char *) &ppacket + size, &packet->pa);
-    n = write(socketfd, &ppacket, size);
+    switch (type) {
+    case SOCK_STREAM:
+        n = write(socketfd, &ppacket, size);
+        break;
+    case SOCK_DGRAM:
+        n = sendto(socketfd, &ppacket, size, 0, (struct sockaddr *) to,
+                   sizeof(struct sockaddr_in));
+        break;
+    default:
+        errx(10, "Invalid protocol");
+    }
     if (n != size)
-        err(1, "send_voice_pkts(socketfd=%d,...): write(packet)%u",
+        err(1, "send_voice_pkts(socketfd=%d,...): write %u bytes",
             socketfd, size);
 #ifdef DEBUG
-    printf("Sending voice packet %u, size = %u, delay = %u usec\n",
-           packet->id, size, timeval_age(&packet->time));
+    printf("Sent voice packet %u to %d, size = %u, delay = %u usec\n",
+           packet->id, type == SOCK_DGRAM ? htons(to->sin_port) : 0, size,
+           timeval_age(&packet->time));
     fflush(stdout);
 #endif
 
@@ -116,13 +131,13 @@ void send_app(int appSock, packet_t * peerPkt, packet_t ** pktQueue,
     packet_t *first;
 
     if (peerPkt->id == *expPktId) {
-        send_voice_pkts(appSock, peerPkt);
+        send_voice_pkts(appSock, peerPkt, SOCK_STREAM, NULL);
         *expPktId = peerPkt->id + 1;
         free(peerPkt);
         if (*pktQueue != NULL) {
             while ((first = q_extract_first(pktQueue)) != NULL
                    && first->id == *expPktId) {
-                send_voice_pkts(appSock, first);
+                send_voice_pkts(appSock, first, SOCK_STREAM, NULL);
                 *expPktId = first->id + 1;
                 free(first);
             }
