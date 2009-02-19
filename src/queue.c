@@ -30,8 +30,8 @@ void q_insert(packet_t ** pktQueue, packet_t * packet)
                 packet->next = (struct packet_t *) current;
                 current = NULL;
             } else {
-                errx(1,
-                     "Oh my god two packets with the same id in Queue!");
+                /* defensive programming! */
+                warnx("Oh my god two packets with the same id in Queue!");
             }
         }
     }

@@ -26,12 +26,13 @@ typedef enum cfgn {
 int main(int argc, char *argv[])
 {
     int i, socks, maxfd, fd[NFDS], recvq_length;
-    uint32_t expected_pkt;
+    uint32_t expected_pkt, last_sent_pkt;
     packet_t *pkt[NPKTS], *recvq;
     config_t cfg[NCFGS];
     fd_set infds, allsetinfds;
 
     expected_pkt = FIRST_PACKET_ID;
+    last_sent_pkt = FIRST_PACKET_ID - 1;
 
     recvq = NULL;
     recvq_length = 0;
@@ -66,9 +67,11 @@ int main(int argc, char *argv[])
         if (recvq_length >= MAX_RECVQ_LENGTH) {
             while (recvq_length > 0) {
                 packet_t *a_pack = q_extract_first(&recvq);
+                warnx("EXTRACTED PKT %u", a_pack->id);
                 recvq_length--;
                 send_voice_pkts(fd[app], a_pack, SOCK_STREAM, NULL);
                 expected_pkt = a_pack->id + 1;
+                warnx("free(%u)", a_pack->id);
                 free(a_pack);
             }
         }
@@ -79,14 +82,20 @@ int main(int argc, char *argv[])
 
                 switch (answ) {
                 case 'A':
-                    manage_ack(pkt[app]);
                     warnx("ACK");
+                    /* defensive programming! */
+                    if (pkt[app]->id == last_sent_pkt) {
+                        warnx("free(%u)", pkt[app]->id);
+                        manage_ack(pkt[app]);
+                    } else
+                        warnx("DOUBLE ACK!");
                     break;
                 case 'N':
-                    manage_nack(fd[peer], pkt[app], &cfg[new]);
                     warnx("NACK");
+                    manage_nack(fd[peer], pkt[app], &cfg[new]);
                     break;
                 case 'C':
+                    warnx("CONFIG!");
                     cfg[old] = cfg[new];
                     cfg[new] = cfg[tmp];
                     reconf_routes(&cfg[old], &cfg[new]);
@@ -94,7 +103,6 @@ int main(int argc, char *argv[])
                 default:
                     errx(ERR_MONPACK);
                 }
-
                 FD_CLR(fd[mon], &infds);
             } else if (FD_ISSET(fd[app], &infds)) {
                 struct sockaddr_in to;
@@ -109,6 +117,7 @@ int main(int argc, char *argv[])
                    cfg[new].n)]; */
                 send_voice_pkts(fd[peer], pkt[app], SOCK_DGRAM,
                                 select_path(&cfg[new], &to));
+                last_sent_pkt = pkt[app]->id;
                 FD_CLR(fd[app], &infds);
             } else if (FD_ISSET(fd[peer], &infds)) {
                 uint32_t pktid;
@@ -120,6 +129,7 @@ int main(int argc, char *argv[])
 
                 if (pktid == expected_pkt) {
                     send_voice_pkts(fd[app], pkt[peer], SOCK_STREAM, NULL);
+                    warnx("free(%u)", pkt[peer]->id);
                     free(pkt[peer]);
                     expected_pkt++;
                 } else if (pktid > expected_pkt) {

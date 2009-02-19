@@ -77,11 +77,9 @@ uint32_t recv_voice_pkts(int socketfd, packet_t * packet, int type,
     size += sizeof(packet->data);
 
 #ifdef DEBUG
-    printf
-        ("Received voice packet %u from %d, size = %u, delay = %u usec\n",
-         packet->id, type == SOCK_DGRAM ? htons(from->sin_port) : 0, size,
-         timeval_age(&packet->time));
-    fflush(stdout);
+    warnx("Received voice packet %u from %d, size = %u, delay = %u usec",
+          packet->id, type == SOCK_DGRAM ? htons(from->sin_port) : 0, size,
+          timeval_age(&packet->time));
 #endif
     return packet->id;
 }
@@ -117,10 +115,9 @@ void send_voice_pkts(int socketfd, packet_t * packet, int type,
         err(1, "send_voice_pkts(socketfd=%d,...): write %u bytes",
             socketfd, size);
 #ifdef DEBUG
-    printf("Sent voice packet %u to %d, size = %u, delay = %u usec\n",
-           packet->id, type == SOCK_DGRAM ? htons(to->sin_port) : 0, size,
-           timeval_age(&packet->time));
-    fflush(stdout);
+    warnx("Sent voice packet %u to %d, size = %u, delay = %u usec",
+          packet->id, type == SOCK_DGRAM ? htons(to->sin_port) : 0, size,
+          timeval_age(&packet->time));
 #endif
 
 }
@@ -177,6 +174,5 @@ char recv_mon(int socketfd, config_t * newconfig)
                     socketfd, i);
         }
     }
-    warnx("RECV");
     return answer;
 }
