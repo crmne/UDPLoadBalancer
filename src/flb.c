@@ -19,13 +19,14 @@ typedef enum types {
 } types;
 int main(int argc, char *argv[])
 {
-    int i, socks, maxfd, fd[NFDS], recvq_length;
+    int i, socks, maxfd, fd[NFDS], recvq_length, idiot;
     uint32_t expected_pkt;
     struct sockaddr_in from;
     packet_t *pkt[NPKTS], *recvq;
     fd_set infds, allsetinfds;
 
     expected_pkt = FIRST_PACKET_ID;
+    idiot = 0;
 
     recvq = NULL;
     recvq_length = 0;
@@ -52,8 +53,10 @@ int main(int argc, char *argv[])
             while (recvq_length > 0) {
                 packet_t *a_pack = q_extract_first(&recvq);
                 recvq_length--;
-                send_voice_pkts(fd[app], a_pack, SOCK_STREAM, NULL);
-                expected_pkt = a_pack->id + 1;
+                if (a_pack->id >= expected_pkt) {
+                    send_voice_pkts(fd[app], a_pack, SOCK_STREAM, NULL);
+                    expected_pkt = a_pack->id + 1;
+                }
                 free(a_pack);
             }
         }
@@ -65,22 +68,26 @@ int main(int argc, char *argv[])
                 pktid =
                     recv_voice_pkts(fd[peer], pkt[peer], SOCK_DGRAM,
                                     &from);
-
                 if (pktid == expected_pkt) {
                     send_voice_pkts(fd[app], pkt[peer], SOCK_STREAM, NULL);
                     free(pkt[peer]);
                     expected_pkt++;
                 } else if (pktid > expected_pkt) {
-                    q_insert(&recvq, pkt[peer]);
-                    recvq_length++;
+                    recvq_length += q_insert(&recvq, pkt[peer]);
                 }
                 warnx("pktid %u, expected_pkt %u", pktid, expected_pkt);
                 FD_CLR(fd[peer], &infds);
             } else if (FD_ISSET(fd[app], &infds)) {
+                if (idiot % 5 == 1) {
+                    send_voice_pkts(fd[peer], pkt[app], SOCK_DGRAM, &from);
+                }
+                if (idiot != 0)
+                    free(pkt[app]);
                 pkt[app] = (packet_t *) malloc(sizeof(packet_t));
                 recv_voice_pkts(fd[app], pkt[app], SOCK_STREAM, NULL);
 
                 send_voice_pkts(fd[peer], pkt[app], SOCK_DGRAM, &from);
+                idiot++;
                 FD_CLR(fd[app], &infds);
             } else
                 errx(ERR_NOFDSET);

@@ -7,6 +7,6 @@ int main(int argc, char *argv[])
 
     printf("&ppacket = %i\n", &ppacket);
     printf("&ppacket + sizeof(packet.id) = %i\n",
-	   (char *) &ppacket + sizeof(packet.id));
+           (char *) &ppacket + sizeof(packet.id));
     return 0;
 }

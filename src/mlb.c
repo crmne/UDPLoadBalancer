@@ -69,8 +69,10 @@ int main(int argc, char *argv[])
                 packet_t *a_pack = q_extract_first(&recvq);
                 warnx("EXTRACTED PKT %u", a_pack->id);
                 recvq_length--;
-                send_voice_pkts(fd[app], a_pack, SOCK_STREAM, NULL);
-                expected_pkt = a_pack->id + 1;
+                if (a_pack->id >= expected_pkt) {
+                    send_voice_pkts(fd[app], a_pack, SOCK_STREAM, NULL);
+                    expected_pkt = a_pack->id + 1;
+                }
                 warnx("free(%u)", a_pack->id);
                 free(a_pack);
             }
@@ -92,7 +94,10 @@ int main(int argc, char *argv[])
                     break;
                 case 'N':
                     warnx("NACK");
-                    manage_nack(fd[peer], pkt[app], &cfg[new]);
+                    if (pkt[app]->id == last_sent_pkt) {
+                        manage_nack(fd[peer], pkt[app], &cfg[new]);
+                    } else
+                        warnx("DOUBLE NACK!");
                     break;
                 case 'C':
                     warnx("CONFIG!");
@@ -109,12 +114,6 @@ int main(int argc, char *argv[])
                 pkt[app] = (packet_t *) malloc(sizeof(packet_t));
                 recv_voice_pkts(fd[app], pkt[app], SOCK_STREAM, NULL);
 
-                /*fd[path] = select_path(&cfg[new]); */
-                /* select path */
-                /*fd[path] =
-                   cfg[new].
-                   socket[(((pkt[app]->id / (25 / cfg[new].n)) - 1 ) %
-                   cfg[new].n)]; */
                 send_voice_pkts(fd[peer], pkt[app], SOCK_DGRAM,
                                 select_path(&cfg[new], &to));
                 last_sent_pkt = pkt[app]->id;
@@ -133,8 +132,7 @@ int main(int argc, char *argv[])
                     free(pkt[peer]);
                     expected_pkt++;
                 } else if (pktid > expected_pkt) {
-                    q_insert(&recvq, pkt[peer]);
-                    recvq_length++;
+                    recvq_length += q_insert(&recvq, pkt[peer]);
                 }
                 warnx("pktid %u, expected_pkt %u", pktid, expected_pkt);
                 FD_CLR(fd[peer], &infds);

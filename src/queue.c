@@ -2,8 +2,9 @@
 #include <stdio.h>
 #include <err.h>
 #include "macro.h"
-void q_insert(packet_t ** pktQueue, packet_t * packet)
+char q_insert(packet_t ** pktQueue, packet_t * packet)
 {
+    char inserted = 1;
     packet_t *current, *prev;
 
     packet->next = NULL;
@@ -30,12 +31,18 @@ void q_insert(packet_t ** pktQueue, packet_t * packet)
                 packet->next = (struct packet_t *) current;
                 current = NULL;
             } else {
+                inserted = 0;
                 /* defensive programming! */
-                warnx("Oh my god two packets with the same id in Queue!");
+                warnx
+                    ("Oh my god two packets with the same id %u in Queue!",
+                     packet->id);
+                current = NULL;
             }
         }
     }
+    return inserted;
 }
+
 packet_t *q_extract_first(packet_t ** pktQueue)
 {
     packet_t *first = NULL;
