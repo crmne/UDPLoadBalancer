@@ -1,7 +1,7 @@
 #!/bin/bash
 # ------------------------
 # Insert your favourites terminal emulators here, in order (the first one found # in the system is used)
-TERMINALS=( urxvt xterm )
+TERMINALS=( xterm urxvt )
 # Programs to run, in order
 PROGRAMS="disttest/Monitor.exe ./mlb ./flb disttest/Appfixed.exe disttest/Appmobile.exe"
 # Delay in seconds between the execution of each program
@@ -22,12 +22,12 @@ function newin() {
 	TERMINAL=""
 	i=0
 	while [ "$TERMINAL" == "" ]; do
-		TERMINAL=`which ${TERMINALS[$i]}`
-		let i=$i+1
-		if [ "$i" == "${#TERMINALS[@]}" ]; then
+		if [ "$i" == "${#TERMINALS[@]} + 1" ]; then
 			echo "No terminal emulators available."
 			exit 1
 		fi
+		TERMINAL=`which ${TERMINALS[$i]} 2> /dev/null`
+		let i=$i+1
 	done
 
 	$TERMINAL -e $@ &
