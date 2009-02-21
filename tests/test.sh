@@ -1,6 +1,6 @@
 #!/bin/bash
 # ------------------------
-# Insert your favourites terminal emulators here, in order (the first one found # in the system is used)
+# Insert your favourites terminal emulators here, in order (the first one found in the system is used)
 TERMINALS=( urxvt xterm )
 # Programs to run, in order
 PROGRAMS="disttest/Monitor.exe ./mlb ./flb disttest/Appfixed.exe disttest/Appmobile.exe"
@@ -26,7 +26,7 @@ function newin() {
 			echo "No terminal emulators available."
 			exit 1
 		fi
-		TERMINAL=`which ${TERMINALS[$i]}`
+		TERMINAL=`which ${TERMINALS[$i]} 2> /dev/null`
 		let i=$i+1
 	done
 
