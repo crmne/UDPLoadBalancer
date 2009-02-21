@@ -3,7 +3,7 @@
 
 #include "packet.h"
 
-void q_insert(packet_t **, packet_t *);
+char q_insert(packet_t **, packet_t *);
 packet_t *q_extract_first(packet_t **);
 packet_t *q_remove(packet_t **, uint32_t);
 uint32_t q_check(int, packet_t **, uint32_t);

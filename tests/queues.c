@@ -34,8 +34,8 @@ int main(int argc, char *argv[])
 
     fprintf(stderr, "Testing removes of first element...\n");
     for (i = 0; i < 10; i++) {
-	getFirstInQ(&Queue);
-	printQueue(Queue);
+        getFirstInQ(&Queue);
+        printQueue(Queue);
     }
 
     fprintf(stderr, "Repopulating queue...\n");
