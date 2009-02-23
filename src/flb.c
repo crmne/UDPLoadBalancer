@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
                 warnx("pktid %u, expected_pkt %u", pktid, expected_pkt);
                 FD_CLR(fd[peer], &infds);
             } else if (FD_ISSET(fd[app], &infds)) {
-                if (idiot % 5 == 1) {
+                if (idiot % 2 == 1) {
                     send_voice_pkts(fd[peer], pkt[app], SOCK_DGRAM, &from);
                 }
                 if (idiot != 0)

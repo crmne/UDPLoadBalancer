@@ -695,12 +695,14 @@ ripeti: ;
 					else if(ris==1)	{ 
 						fprintf(stderr,"SCARTO idmsg %u da latomobile\n", idmsg);
 						notify(monitorfd,0,idmsg); /* notifica scartato */
+						numscartati++;
 					}
 					else if(ris==2)	{ 
 						#ifdef VICDEBUG
 						P("SPEDISCOmobile"); 
 						#endif
 						notify(monitorfd,1,idmsg); /* notifica spedito */
+						numspediti++;
 					}
 					else { P("CHEE'mobile "); ;}
 				}

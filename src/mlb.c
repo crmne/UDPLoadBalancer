@@ -26,7 +26,7 @@ typedef enum cfgn {
 int main(int argc, char *argv[])
 {
     int i, socks, maxfd, fd[NFDS], recvq_length;
-    uint32_t expected_pkt, last_sent_pkt;
+    uint32_t expected_pkt, last_sent_pkt, last_freed_pkt;
     packet_t *pkt[NPKTS], *recvq;
     config_t cfg[NCFGS];
     fd_set infds, allsetinfds;
@@ -86,9 +86,10 @@ int main(int argc, char *argv[])
                 case 'A':
                     warnx("ACK");
                     /* defensive programming! */
-                    if (pkt[app]->id == last_sent_pkt) {
+                    if (pkt[app]->id == last_sent_pkt && pkt[app]->id != last_freed_pkt) {
                         warnx("free(%u)", pkt[app]->id);
                         manage_ack(pkt[app]);
+			last_freed_pkt = pkt[app]->id;
                     } else
                         warnx("DOUBLE ACK!");
                     break;
