@@ -33,9 +33,9 @@ char q_insert(packet_t ** pktQueue, packet_t * packet)
             } else {
                 inserted = 0;
                 /* defensive programming! */
-                warnx
-                    ("Oh my god two packets with the same id %u in Queue!",
-                     packet->id);
+#ifdef DEBUG
+                warnx(WARN_2PKTQ);
+#endif
                 current = NULL;
             }
         }

@@ -11,9 +11,6 @@
 #define FIRST_PACKET_ID 0
 #define MAX_RECVQ_LENGTH 2
 
-#define ERR_SELECT 1, "select()"
-#define ERR_MONPACK 2, "Monitor packet not understood"
-#define ERR_NOFDSET 3, "Incoming data, but in no controlled fd. Strange"
 typedef enum types {
     app, peer, path
 } types;
@@ -75,9 +72,12 @@ int main(int argc, char *argv[])
                 } else if (pktid > expected_pkt) {
                     recvq_length += q_insert(&recvq, pkt[peer]);
                 }
+#ifdef DEBUG
                 warnx("pktid %u, expected_pkt %u", pktid, expected_pkt);
+#endif
                 FD_CLR(fd[peer], &infds);
             } else if (FD_ISSET(fd[app], &infds)) {
+                /* FIXME */
                 if (idiot % 2 == 1) {
                     send_voice_pkts(fd[peer], pkt[app], SOCK_DGRAM, &from);
                 }

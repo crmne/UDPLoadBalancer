@@ -84,6 +84,6 @@ uint32_t timeval_age(const struct timeval * tv)
     struct timeval now;
 
     if (gettimeofday(&now, NULL) != 0)
-        err(1, "gettimeofday()");
+        err(ERR_GETTIMEOFDAY);
     return timeval_diff(&now, tv);
 }

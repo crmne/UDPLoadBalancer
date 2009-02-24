@@ -9,7 +9,7 @@
 
 #include "macro.h"
 
-void reconf_routes(config_t * oldcfg, config_t * newcfg)
+void print_routes(config_t * newcfg)
 {
     int i;
 
@@ -23,27 +23,8 @@ void reconf_routes(config_t * oldcfg, config_t * newcfg)
     fflush(stdout);
 }
 
-int get_local_port(int socketfd)
-{
-    int ris;
-    struct sockaddr_in local;
-    unsigned int addr_size;
-
-    addr_size = sizeof(local);
-    memset((char *) &local, 0, sizeof(local));
-    local.sin_family = AF_INET;
-
-    ris = getsockname(socketfd, (struct sockaddr *) &local, &addr_size);
-    if (ris < 0) {
-        warn("getsockname()");
-        return (0);
-    }
-
-    return (ntohs(local.sin_port));
-}
-
 uint32_t recv_voice_pkts(int socketfd, packet_t * packet, int type,
-                         struct sockaddr_in * from)
+                         struct sockaddr_in *from)
 {
     int n = 0;
     unsigned int size = 0, len = sizeof(struct sockaddr_in);
@@ -61,13 +42,12 @@ uint32_t recv_voice_pkts(int socketfd, packet_t * packet, int type,
                      (struct sockaddr *) from, &len);
         break;
     default:
-        errx(10, "Invalid protocol");
+        errx(ERR_INVALIDPROTO);
     }
     if (n == 0)
-        errx(2, "Nothing received, maybe the other end is down? Exiting.");
+        errx(ERR_READZERO);
     if (n != sizeof(ppacket))
-        err(1, "recv_voice_pkts(socketfd=%d,...): read %d bytes", socketfd,
-            n);
+        err(ERR_RECV);
 
     memcpy(&packet->id, &ppacket, sizeof(packet->id));
     size += sizeof(packet->id);
@@ -109,11 +89,10 @@ void send_voice_pkts(int socketfd, packet_t * packet, int type,
                    sizeof(struct sockaddr_in));
         break;
     default:
-        errx(10, "Invalid protocol");
+        errx(ERR_INVALIDPROTO);
     }
     if (n != size)
-        err(1, "send_voice_pkts(socketfd=%d,...): write %u bytes",
-            socketfd, size);
+        err(ERR_SEND);
 #ifdef DEBUG
     warnx("Sent voice packet %u to %d, size = %u, delay = %u usec",
           packet->id, type == SOCK_DGRAM ? htons(to->sin_port) : 0, size,
@@ -158,20 +137,19 @@ char recv_mon(int socketfd, config_t * newconfig)
 
     n = read(socketfd, &answer, sizeof(answer));
     if (n == 0)
-        errx(2, "Nothing received, maybe Monitor is down? Exiting.");
+        errx(ERR_READZERO);
     if (n != sizeof(answer))
-        err(1, "recv_mon(socketfd=%d,...): read(answer)", socketfd);
+        err(ERR_RECV);
     newconfig->type = answer;
     n = read(socketfd, &newconfig->n, sizeof(newconfig->n));
     if (n != sizeof(newconfig->n))
-        err(1, "recv_mon(socketfd=%d,...): read(n)", socketfd);
+        err(ERR_RECV);
     if (answer == 'C') {
         for (i = 0; i < newconfig->n; i++) {
             n = read(socketfd, &newconfig->port[i],
                      sizeof(newconfig->port[i]));
             if (n != sizeof(newconfig->port[i]))
-                err(1, "recv_mon(socketfd=%d,...): read(port[%d])",
-                    socketfd, i);
+                err(ERR_RECV);
         }
     }
     return answer;

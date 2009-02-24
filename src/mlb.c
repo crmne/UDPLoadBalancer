@@ -14,9 +14,6 @@
 #define FIRST_PACKET_ID 9999
 #define MAX_RECVQ_LENGTH 2
 
-#define ERR_SELECT 1, "select()"
-#define ERR_MONPACK 2, "Monitor packet not understood"
-#define ERR_NOFDSET 3, "Incoming data, but in no controlled fd. Strange"
 typedef enum types {
     mon, app, peer, path
 } types;
@@ -32,7 +29,7 @@ int main(int argc, char *argv[])
     fd_set infds, allsetinfds;
 
     expected_pkt = FIRST_PACKET_ID;
-    last_sent_pkt = FIRST_PACKET_ID - 1;
+    last_freed_pkt = last_sent_pkt = FIRST_PACKET_ID - 1;
 
     recvq = NULL;
     recvq_length = 0;
@@ -67,13 +64,17 @@ int main(int argc, char *argv[])
         if (recvq_length >= MAX_RECVQ_LENGTH) {
             while (recvq_length > 0) {
                 packet_t *a_pack = q_extract_first(&recvq);
+#ifdef DEBUG
                 warnx("EXTRACTED PKT %u", a_pack->id);
+#endif
                 recvq_length--;
                 if (a_pack->id >= expected_pkt) {
                     send_voice_pkts(fd[app], a_pack, SOCK_STREAM, NULL);
                     expected_pkt = a_pack->id + 1;
                 }
+#ifdef DEBUG
                 warnx("free(%u)", a_pack->id);
+#endif
                 free(a_pack);
             }
         }
@@ -84,27 +85,42 @@ int main(int argc, char *argv[])
 
                 switch (answ) {
                 case 'A':
+#ifdef DEBUG
                     warnx("ACK");
+#endif
                     /* defensive programming! */
-                    if (pkt[app]->id == last_sent_pkt && pkt[app]->id != last_freed_pkt) {
+                    if (pkt[app]->id == last_sent_pkt
+                        && pkt[app]->id != last_freed_pkt) {
+#ifdef DEBUG
                         warnx("free(%u)", pkt[app]->id);
+#endif
                         manage_ack(pkt[app]);
-			last_freed_pkt = pkt[app]->id;
-                    } else
+                        last_freed_pkt = pkt[app]->id;
+                    }
+#ifdef DEBUG
+                    else
                         warnx("DOUBLE ACK!");
+#endif
                     break;
                 case 'N':
+#ifdef DEBUG
                     warnx("NACK");
+#endif
                     if (pkt[app]->id == last_sent_pkt) {
                         manage_nack(fd[peer], pkt[app], &cfg[new]);
-                    } else
+                    }
+#ifdef DEBUG
+                    else
                         warnx("DOUBLE NACK!");
+#endif
                     break;
                 case 'C':
+#ifdef DEBUG
                     warnx("CONFIG!");
+#endif
                     cfg[old] = cfg[new];
                     cfg[new] = cfg[tmp];
-                    reconf_routes(&cfg[old], &cfg[new]);
+                    print_routes(&cfg[new]);
                     break;
                 default:
                     errx(ERR_MONPACK);
@@ -113,6 +129,8 @@ int main(int argc, char *argv[])
             } else if (FD_ISSET(fd[app], &infds)) {
                 struct sockaddr_in to;
                 pkt[app] = (packet_t *) malloc(sizeof(packet_t));
+                if (pkt[app] == NULL)
+                    err(ERR_MALLOC);
                 recv_voice_pkts(fd[app], pkt[app], SOCK_STREAM, NULL);
 
                 send_voice_pkts(fd[peer], pkt[app], SOCK_DGRAM,
@@ -123,19 +141,25 @@ int main(int argc, char *argv[])
                 uint32_t pktid;
                 struct sockaddr_in from;
                 pkt[peer] = (packet_t *) malloc(sizeof(packet_t));
+                if (pkt[app] == NULL)
+                    err(ERR_MALLOC);
                 pktid =
                     recv_voice_pkts(fd[peer], pkt[peer], SOCK_DGRAM,
                                     &from);
 
                 if (pktid == expected_pkt) {
                     send_voice_pkts(fd[app], pkt[peer], SOCK_STREAM, NULL);
+#ifdef DEBUG
                     warnx("free(%u)", pkt[peer]->id);
+#endif
                     free(pkt[peer]);
                     expected_pkt++;
                 } else if (pktid > expected_pkt) {
                     recvq_length += q_insert(&recvq, pkt[peer]);
                 }
+#ifdef DEBUG
                 warnx("pktid %u, expected_pkt %u", pktid, expected_pkt);
+#endif
                 FD_CLR(fd[peer], &infds);
             } else
                 errx(ERR_NOFDSET);

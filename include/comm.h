@@ -3,7 +3,7 @@
 
 #include "packet.h"
 
-void reconf_routes(config_t *, config_t *);
+void print_routes(config_t *);
 char recv_mon(int, config_t *);
 uint32_t recv_voice_pkts(int, packet_t *, int, struct sockaddr_in *);
 void send_voice_pkts(int, packet_t *, int, struct sockaddr_in *);

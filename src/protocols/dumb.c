@@ -8,8 +8,12 @@ struct sockaddr_in *select_path(config_t * config, struct sockaddr_in *to)
 {
     to->sin_family = AF_INET;
     to->sin_addr.s_addr = inet_addr(HOST);
-    to->sin_port =
-        htons(config->port[((last_path++ - 1) / 3) % config->n]);
+    if (config->n == 0) {
+        warnx("No available routes!");
+        to->sin_port = 0;
+    } else
+        to->sin_port =
+            htons(config->port[((last_path++ - 1) / 3) % config->n]);
     return to;
 }
 

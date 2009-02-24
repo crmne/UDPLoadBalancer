@@ -13,6 +13,7 @@
 #define PACKET_SIZE 100
 #define MAX_TIME MAX_DELAY - 5000
 
+#include "error.h"
 #include "packet.h"
 #include "timeval.h"
 #include "conn.h"
