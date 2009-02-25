@@ -3,17 +3,21 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include "macro.h"
-int last_path = 0;
-struct sockaddr_in *select_path(config_t * config, struct sockaddr_in *to)
+unsigned int path = 0;
+struct sockaddr_in *select_path(config_t * config, struct sockaddr_in *to,
+                                uint32_t average_delay)
 {
     to->sin_family = AF_INET;
     to->sin_addr.s_addr = inet_addr(HOST);
-    if (config->n == 0) {
+    if (config->n != 0) {
+        if (average_delay > (MAX_DELAY * 8 / 15))
+            path = (path + 1) % config->n;
+        to->sin_port = htons(config->port[path]);
+
+    } else {
         warnx("No available routes!");
         to->sin_port = 0;
-    } else
-        to->sin_port =
-            htons(config->port[((last_path++ - 1) / 3) % config->n]);
+    }
     return to;
 }
 
@@ -22,40 +26,10 @@ void manage_ack(packet_t * lastSent)
     free(lastSent);
 }
 
-void manage_nack(int socketfd, packet_t * lastSent, config_t * config)
+void manage_nack(int socketfd, packet_t * lastSent, config_t * config,
+                 uint32_t average_delay)
 {
     struct sockaddr_in to;
     send_voice_pkts(socketfd, lastSent, SOCK_DGRAM,
-                    select_path(config, &to));
-}
-
-unsigned int pa_cpy_to_pp(char *pp, struct packet_additions_t *pa)
-{
-    int i;
-    unsigned int n = 0;
-    if (pa->n > 0) {
-        memcpy(pp, &pa->n, sizeof(pa->n));
-        n = sizeof(pa->n);
-        for (i = 0; i < pa->n; i++) {
-            memcpy((char *) pp + n, &pa->port[i], sizeof(pa->port[i]));
-            n += sizeof(pa->port[i]);
-        }
-    }
-    return n;
-}
-
-unsigned int pa_cpy_from_pp(struct packet_additions_t *pa, char *pp)
-{
-    int i;
-    unsigned int n = 0;
-    memcpy(&pa->n, pp, sizeof(pa->n));
-    warnx("%u ports", pa->n);
-    if (pa->n > 0) {
-        n = sizeof(pa->n);
-        for (i = 0; i < pa->n; i++) {
-            memcpy(&pa->port[i], (char *) pp + n, sizeof(pa->port[i]));
-            n += sizeof(pa->port[i]);
-        }
-    }
-    return n;
+                    select_path(config, &to, average_delay));
 }

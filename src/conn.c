@@ -35,10 +35,6 @@ int create_sock(int type)
     return socketfd;
 }
 
-/** Sets up a listening socket
- * @param port which we want to listen
- * @return file descriptor of created socket
- */
 int listen_app(const char *addr, int port)
 {
     struct sockaddr_in sock;
@@ -91,7 +87,7 @@ int accept_app(int socketfd)
 }
 
 
-int listen_udp(const char *addr, int port)
+int bind_udp(const char *addr, int port)
 {
     struct sockaddr_in addr_in;
     int socketfd = create_sock(SOCK_DGRAM);
@@ -101,17 +97,3 @@ int listen_udp(const char *addr, int port)
         err(ERR_BIND);
     return socketfd;
 }
-
-/*
-int connect_udp(const char *addr, int port)
-{
-    struct sockaddr_in addr_in;
-    int socketfd = create_sock(SOCK_DGRAM);
-
-    addr_in = set_sock(addr, port);
-    if (connect(socketfd, (struct sockaddr *) &addr_in, sizeof(addr_in)) <
-        0)
-        err(1, "connect_udp(): connect(port=%d,socketfd=%d)", port,
-            socketfd);
-    return socketfd;
-}*/

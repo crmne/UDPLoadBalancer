@@ -485,7 +485,7 @@ void notify(int monitorfd, int cmdack, uint32_t idmsg)
 void usage(void) 
 {  printf ("usage: ./Monitor.exe REMOTEPORTMOBILE LOCALPORTMONITOR FIRSTLOCALPORTMOBILESIDE FIRSTLOCALPORTFIXEDSIDE REMOTEPORTFIXED"
 		   " PACKETLOSSPERC\n"
-				"esempio: "  PARAMETRIDEFAULT "%d\n", PERC_ERR);
+				"esempio: "  PARAMETRIDEFAULT " %d\n", PERC_ERR);
 }
 
 int main(int argc, char *argv[])
@@ -505,7 +505,7 @@ int main(int argc, char *argv[])
 		remote_port_number_fixed = 10001;
 		PERCENTUALE_ERRORE=PERC_ERR;
 	}
-	else if(argc!=6) { printf ("necessari 6 parametri\n"); usage(); exit(1);  }
+	else if(argc!=7) { printf ("necessari 6 parametri\n"); usage(); exit(1);  }
 	else { /* leggo parametri da linea di comando */
 		remote_port_number_mobile = atoi(argv[1]);
 		local_port_number_monitor = atoi(argv[2]);

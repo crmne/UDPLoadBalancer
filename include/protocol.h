@@ -5,12 +5,10 @@
 #include "packet.h"
 #include PROTO_H
 
-struct sockaddr_in *select_path(config_t *, struct sockaddr_in *);
+struct sockaddr_in *select_path(config_t *, struct sockaddr_in *,
+                                uint32_t);
 void manage_ack(packet_t *);
-void manage_nack(int, packet_t *, config_t *);
-unsigned int pa_cpy_to_pp(char *, struct packet_additions_t *);
-unsigned int pa_cpy_from_pp(struct packet_additions_t *, char *);
-void is_not_exp_pkt(packet_t *, uint32_t);
+void manage_nack(int, packet_t *, config_t *, uint32_t);
 
 #else
 #error "You must specify a protocol. To do this set the PROTOCOL variable accordingly in the Makefile. See include/protocols for a list of protocols available."

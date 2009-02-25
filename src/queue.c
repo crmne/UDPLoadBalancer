@@ -32,7 +32,6 @@ char q_insert(packet_t ** pktQueue, packet_t * packet)
                 current = NULL;
             } else {
                 inserted = 0;
-                /* defensive programming! */
 #ifdef DEBUG
                 warnx(WARN_2PKTQ);
 #endif
@@ -103,23 +102,3 @@ void q_print(packet_t * queue)
         fprintf(stderr, "NULL\n");
     }
 }
-
-/*uint32_t
-q_check (int socketfd, packet_t ** pktQueue, uint32_t expPktId)
-{
-  uint32_t lastone = 0;
-  if (current != NULL)
-  {
-    if (MAXDELAY - timeval_load (current->time) <= CHECKTIME + 5)
-    {
-      lastone = current->id;
-      while ((current = q_extract_first (pktQueue)) != NULL)
-      {
-	if (current->id >= expPktId)
-	  send_voice_pkts (socketfd, current);
-	free (current);
-      }
-    }
-  }
-  return lastone;
-}*/

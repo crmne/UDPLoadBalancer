@@ -9,44 +9,32 @@
 
 #include "macro.h"
 
-void print_routes(config_t * newcfg)
-{
-    int i;
-
-    printf("New Config!");
-
-    for (i = 0; i < newcfg->n; i++) {
-        printf(" %u", newcfg->port[i]);
-    }
-
-    printf("\n");
-    fflush(stdout);
-}
-
 uint32_t recv_voice_pkts(int socketfd, packet_t * packet, int type,
                          struct sockaddr_in *from)
 {
     int n = 0;
-    unsigned int size = 0, len = sizeof(struct sockaddr_in);
-    char ppacket[PACKET_SIZE];
+    char ppacket[PACKET_SIZE + sizeof(char)];
+    unsigned int size = 0, len = sizeof(struct sockaddr_in), plen =
+        sizeof(ppacket);
 
-    memset(&ppacket, 0, sizeof(ppacket));
+    memset(&ppacket, 0, plen);
     memset(packet, 0, sizeof(packet_t));
 
     switch (type) {
     case SOCK_STREAM:
-        n = read(socketfd, &ppacket, sizeof(ppacket));
+        plen -= sizeof(char);
+        n = read(socketfd, &ppacket, plen);
         break;
     case SOCK_DGRAM:
-        n = recvfrom(socketfd, &ppacket, sizeof(ppacket), 0,
-                     (struct sockaddr *) from, &len);
+        n = recvfrom(socketfd, &ppacket, plen, 0, (struct sockaddr *) from,
+                     &len);
         break;
     default:
         errx(ERR_INVALIDPROTO);
     }
     if (n == 0)
         errx(ERR_READZERO);
-    if (n != sizeof(ppacket))
+    if (n != plen)
         err(ERR_RECV);
 
     memcpy(&packet->id, &ppacket, sizeof(packet->id));
@@ -56,6 +44,10 @@ uint32_t recv_voice_pkts(int socketfd, packet_t * packet, int type,
     memcpy(&packet->data, (char *) &ppacket + size, sizeof(packet->data));
     size += sizeof(packet->data);
 
+    if (size < plen) {
+        memcpy(&packet->pa.ploss, (char *) &ppacket + size, sizeof(char));
+        size += sizeof(char);
+    }
 #ifdef DEBUG
     warnx("Received voice packet %u from %d, size = %u, delay = %u usec",
           packet->id, type == SOCK_DGRAM ? htons(from->sin_port) : 0, size,
@@ -69,7 +61,7 @@ void send_voice_pkts(int socketfd, packet_t * packet, int type,
 {
     int n = 0;
     unsigned int size = 0;
-    char ppacket[PACKET_SIZE];
+    char ppacket[PACKET_SIZE + sizeof(char)];
 
     memset(&ppacket, 0, sizeof(ppacket));
 
@@ -85,6 +77,8 @@ void send_voice_pkts(int socketfd, packet_t * packet, int type,
         n = write(socketfd, &ppacket, size);
         break;
     case SOCK_DGRAM:
+        memcpy((char *) &ppacket + size, &packet->pa.ploss, sizeof(char));
+        size += sizeof(char);
         n = sendto(socketfd, &ppacket, size, 0, (struct sockaddr *) to,
                    sizeof(struct sockaddr_in));
         break;
@@ -121,15 +115,9 @@ void send_app(int appSock, packet_t * peerPkt, packet_t ** pktQueue,
     } else {
         q_insert(pktQueue, peerPkt);
         q_print(*pktQueue);
-        /*is_not_exp_pkt(peerPkt, *expPktId); */
     }
 }
 
-/** Receive packets from monitor
- * @param socketfd
- * @param buffer
- * @return C for config, A for ack, N for nack
- */
 char recv_mon(int socketfd, config_t * newconfig)
 {
     int n, i;
