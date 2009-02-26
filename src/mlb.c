@@ -3,14 +3,14 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <arpa/inet.h>
 #include "macro.h"
 
-#define NFDS 4
+#define NFDS 3
 #define NPKTS 3
-#define NCFGS 3
+#define NCFGS 2
 #define NPKTIDS 4
 #define NCOUNTERS 2
-#define NLOSSCOUNTERS 2
 #define LASTDELAYS 10
 #define APP_PORT 6001
 #define PEER_PORT 7001
@@ -18,10 +18,10 @@
 #define FIRST_PACKET_ID 9999
 #define MAX_RECVQ_LENGTH 2
 typedef enum types {
-    mon, app, peer, path
+    mon, app, peer
 } types;
 typedef enum cfgn {
-    old, new, tmp
+    new, tmp
 } cfgn;
 typedef enum pktids {
     expected, sentpeer, sentapp, freed
@@ -29,9 +29,24 @@ typedef enum pktids {
 typedef enum counters {
     delivered, discarded
 } counters;
-typedef enum losscounters {
-    here, there                 /* FIXME: there not needed! */
-} losscounters;
+unsigned int path = 0;
+struct sockaddr_in *select_path(config_t * config, struct sockaddr_in *to,
+                                uint32_t average_delay)
+{
+    to->sin_family = AF_INET;
+    to->sin_addr.s_addr = inet_addr(HOST);
+    if (config->n != 0) {
+        if (average_delay > (MAX_DELAY * 8 / 15))
+            path = (path + 1) % config->n;
+        to->sin_port = htons(config->port[path]);
+
+    } else {
+        warnx("No available routes!");
+        to->sin_port = 0;
+    }
+    return to;
+}
+
 void print_routes(config_t * newcfg)
 {
     int i;
@@ -50,13 +65,14 @@ int main(int argc, char *argv[])
 {
     int i, socks, maxfd, fd[NFDS], recvq_length;
     uint32_t pktid[NPKTIDS], count[NCOUNTERS];
-    char losscount[NLOSSCOUNTERS];
+    char losscount;
     uint32_t lastdelays[LASTDELAYS], lastdelayindex, averagedelay;
     packet_t *pkt[NPKTS], *recvq;
     config_t cfg[NCFGS];
     fd_set infds, allsetinfds;
 
     averagedelay = 0;
+    losscount = 0;
     lastdelayindex = 0;
     recvq = NULL;
     recvq_length = 0;
@@ -68,9 +84,6 @@ int main(int argc, char *argv[])
 
     for (i = 0; i < NCOUNTERS; i++)
         count[i] = 0;
-
-    for (i = 0; i < NLOSSCOUNTERS; i++)
-        losscount[i] = 0;
 
     for (i = 0; i < NPKTS; i++)
         pkt[i] = NULL;
@@ -99,7 +112,7 @@ int main(int argc, char *argv[])
         if (socks <= 0)
             err(ERR_SELECT);
         if (count[delivered] + count[discarded] > 0)
-            losscount[here] =
+            losscount =
                 ((double) count[discarded] /
                  (double) (count[delivered] + count[discarded])) * 100;
         if (count[delivered] >= LASTDELAYS) {
@@ -137,18 +150,19 @@ int main(int argc, char *argv[])
                 case 'A':
                     if (pkt[app]->id == pktid[sentpeer]
                         && pkt[app]->id != pktid[freed]) {
-                        manage_ack(pkt[app]);
+                        free(pkt[app]);
                         pktid[freed] = pkt[app]->id;
                     }
                     break;
                 case 'N':
                     if (pkt[app]->id == pktid[sentpeer]) {
-                        manage_nack(fd[peer], pkt[app], &cfg[new],
-                                    averagedelay);
+                        struct sockaddr_in to;
+                        send_voice_pkts(fd[peer], pkt[app], SOCK_DGRAM,
+                                        select_path(&cfg[new], &to,
+                                                    averagedelay));
                     }
                     break;
                 case 'C':
-                    cfg[old] = cfg[new];
                     cfg[new] = cfg[tmp];
                     print_routes(&cfg[new]);
                     break;
@@ -162,7 +176,7 @@ int main(int argc, char *argv[])
                 if (pkt[app] == NULL)
                     err(ERR_MALLOC);
                 recv_voice_pkts(fd[app], pkt[app], SOCK_STREAM, NULL);
-                pkt[app]->pa.ploss = losscount[here];
+                pkt[app]->ploss = losscount;
                 send_voice_pkts(fd[peer], pkt[app], SOCK_DGRAM,
                                 select_path(&cfg[new], &to, averagedelay));
                 pktid[sentpeer] = pkt[app]->id;
@@ -176,7 +190,7 @@ int main(int argc, char *argv[])
                 recvpktid =
                     recv_voice_pkts(fd[peer], pkt[peer], SOCK_DGRAM,
                                     &from);
-                losscount[there] = pkt[peer]->pa.ploss;
+                losscount = pkt[peer]->ploss;
                 if (recvpktid == pktid[expected]) {
                     send_voice_pkts(fd[app], pkt[peer], SOCK_STREAM, NULL);
                     lastdelays[lastdelayindex] =

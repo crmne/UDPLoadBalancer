@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
                 pktid =
                     recv_voice_pkts(fd[peer], pkt[peer], SOCK_DGRAM,
                                     &from);
-                peerloss = pkt[peer]->pa.ploss;
+                peerloss = pkt[peer]->ploss;
                 if (pktid == expected_pkt) {
                     send_voice_pkts(fd[app], pkt[peer], SOCK_STREAM, NULL);
                     free(pkt[peer]);
@@ -90,6 +90,7 @@ int main(int argc, char *argv[])
                 free(pkt[app]);
                 pkt[app] = (packet_t *) malloc(sizeof(packet_t));
                 recv_voice_pkts(fd[app], pkt[app], SOCK_STREAM, NULL);
+                pkt[app]->ploss = 0;
                 send_voice_pkts(fd[peer], pkt[app], SOCK_DGRAM, &from);
                 FD_CLR(fd[app], &infds);
             } else

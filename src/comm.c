@@ -9,7 +9,7 @@
 
 #include "macro.h"
 
-uint32_t recv_voice_pkts(int socketfd, packet_t * packet, int type,
+uint32_t recv_voice_pkts(int socketfd, packet_t * packet, int transport,
                          struct sockaddr_in *from)
 {
     int n = 0;
@@ -20,7 +20,7 @@ uint32_t recv_voice_pkts(int socketfd, packet_t * packet, int type,
     memset(&ppacket, 0, plen);
     memset(packet, 0, sizeof(packet_t));
 
-    switch (type) {
+    switch (transport) {
     case SOCK_STREAM:
         plen -= sizeof(char);
         n = read(socketfd, &ppacket, plen);
@@ -28,9 +28,11 @@ uint32_t recv_voice_pkts(int socketfd, packet_t * packet, int type,
     case SOCK_DGRAM:
         n = recvfrom(socketfd, &ppacket, plen, 0, (struct sockaddr *) from,
                      &len);
+        if (n == plen - sizeof(char))
+            plen -= sizeof(char);
         break;
     default:
-        errx(ERR_INVALIDPROTO);
+        errx(ERR_TRANSPORT);
     }
     if (n == 0)
         errx(ERR_READZERO);
@@ -45,18 +47,18 @@ uint32_t recv_voice_pkts(int socketfd, packet_t * packet, int type,
     size += sizeof(packet->data);
 
     if (size < plen) {
-        memcpy(&packet->pa.ploss, (char *) &ppacket + size, sizeof(char));
+        memcpy(&packet->ploss, (char *) &ppacket + size, sizeof(char));
         size += sizeof(char);
     }
 #ifdef DEBUG
     warnx("Received voice packet %u from %d, size = %u, delay = %u usec",
-          packet->id, type == SOCK_DGRAM ? htons(from->sin_port) : 0, size,
-          timeval_age(&packet->time));
+          packet->id, transport == SOCK_DGRAM ? htons(from->sin_port) : 0,
+          size, timeval_age(&packet->time));
 #endif
     return packet->id;
 }
 
-void send_voice_pkts(int socketfd, packet_t * packet, int type,
+void send_voice_pkts(int socketfd, packet_t * packet, int transport,
                      struct sockaddr_in *to)
 {
     int n = 0;
@@ -72,50 +74,29 @@ void send_voice_pkts(int socketfd, packet_t * packet, int type,
     memcpy((char *) &ppacket + size, &packet->data, sizeof(packet->data));
     size += sizeof(packet->data);
 
-    switch (type) {
+    switch (transport) {
     case SOCK_STREAM:
         n = write(socketfd, &ppacket, size);
         break;
     case SOCK_DGRAM:
-        memcpy((char *) &ppacket + size, &packet->pa.ploss, sizeof(char));
-        size += sizeof(char);
+        if (packet->ploss != 0) {
+            memcpy((char *) &ppacket + size, &packet->ploss, sizeof(char));
+            size += sizeof(char);
+        }
         n = sendto(socketfd, &ppacket, size, 0, (struct sockaddr *) to,
                    sizeof(struct sockaddr_in));
         break;
     default:
-        errx(ERR_INVALIDPROTO);
+        errx(ERR_TRANSPORT);
     }
     if (n != size)
         err(ERR_SEND);
 #ifdef DEBUG
     warnx("Sent voice packet %u to %d, size = %u, delay = %u usec",
-          packet->id, type == SOCK_DGRAM ? htons(to->sin_port) : 0, size,
-          timeval_age(&packet->time));
+          packet->id, transport == SOCK_DGRAM ? htons(to->sin_port) : 0,
+          size, timeval_age(&packet->time));
 #endif
 
-}
-
-void send_app(int appSock, packet_t * peerPkt, packet_t ** pktQueue,
-              uint32_t * expPktId)
-{
-    packet_t *first;
-
-    if (peerPkt->id == *expPktId) {
-        send_voice_pkts(appSock, peerPkt, SOCK_STREAM, NULL);
-        *expPktId = peerPkt->id + 1;
-        free(peerPkt);
-        if (*pktQueue != NULL) {
-            while ((first = q_extract_first(pktQueue)) != NULL
-                   && first->id == *expPktId) {
-                send_voice_pkts(appSock, first, SOCK_STREAM, NULL);
-                *expPktId = first->id + 1;
-                free(first);
-            }
-        }
-    } else {
-        q_insert(pktQueue, peerPkt);
-        q_print(*pktQueue);
-    }
 }
 
 char recv_mon(int socketfd, config_t * newconfig)

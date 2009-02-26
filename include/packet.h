@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include <sys/time.h>
-#include PROTO_H
 
 typedef struct {
     char type;
@@ -16,7 +15,7 @@ typedef struct {
     struct timeval time;
     char data[PACKET_SIZE - sizeof(uint32_t) - sizeof(struct timeval)];
     struct packet_t *next;
-    struct packet_additions_t pa;
+    char ploss;
 } packet_t;
 
 #endif

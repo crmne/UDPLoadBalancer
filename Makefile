@@ -1,11 +1,10 @@
-PROTOCOL=dumb
-INCLUDES=-Iinclude -Iinclude/protocols
+INCLUDES=-Iinclude
 LDFLAGS=-lpthread -lm
-DEFINES=-DPROTO_H=\"${PROTOCOL}.h\" -DDEBUG
+DEFINES=-DDEBUG
 CFLAGS=${INCLUDES} -O3 -pipe -Wall -ansi -pedantic -ggdb ${DEFINES}
 SUBDIRS=disttest tests
-CORE=src/conn.o src/comm.o src/queue.o src/timeval.o src/protocols/$(PROTOCOL).o
-SOURCES=src/*.c src/protocols/*.c include/*.h include/protocols/*.h
+CORE=src/conn.o src/comm.o src/queue.o src/timeval.o
+SOURCES=src/*.c include/*.h
 EXECUTABLES=mlb flb
 CC=@echo "Compiling $@ ...";cc
 LD=@echo "Linking $@ ...";cc
@@ -33,7 +32,7 @@ indent:
 	else echo "Sorry, GNU indent required!"; fi
 
 cleanplot:
-	-rm *.png fit.log 2> /dev/null
+	-rm *.png 2> /dev/null
 
 cleanindent:
 	-for i in ${SOURCES}; do rm -f $$i~ 2> /dev/null; done
@@ -42,5 +41,4 @@ cleansubdirs:
 	-for i in $(SUBDIRS); do $(MAKE) -C "$${i}" clean; done
 
 clean:	cleansubdirs cleanindent cleanplot
-	-rm -f core* *.stackdump *.txt 2> /dev/null
-	-rm -f $(EXECUTABLES) src/*.o src/protocols/*.o 2> /dev/null
+	-rm -f $(EXECUTABLES) $(CORE) *.txt 2> /dev/null

@@ -11,14 +11,12 @@
 #define MAX_DELAY 150000
 #define PACKET_RATE 40000
 #define PACKET_SIZE 100
-#define MAX_TIME MAX_DELAY - 5000
 
 #include "error.h"
 #include "packet.h"
 #include "timeval.h"
 #include "conn.h"
 #include "comm.h"
-#include "protocol.h"
 #include "queue.h"
 
 #endif
