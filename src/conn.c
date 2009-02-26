@@ -46,7 +46,7 @@ int listen_app(const char *addr, int port)
         err(ERR_BIND);
     if (listen(socketfd, MAX_CONNS) < 0)
         err(ERR_LISTEN);
-    printf("Waiting for App on port %d... ", port);
+    printf("Waiting for App to connect on port %d... ", port);
     fflush(stdout);
     return socketfd;
 }
@@ -80,7 +80,7 @@ int accept_app(int socketfd)
     newsocketfd = accept(socketfd, (struct sockaddr *) &sock, &len);
     if (newsocketfd < 0)
         err(ERR_ACCEPT);
-    printf("Connected!\n");
+    printf("connected!\n");
     fflush(stdout);
     return newsocketfd;
 

@@ -1,27 +1,37 @@
-#include <string.h>             /* memset */
+#include <string.h>
 #include <err.h>
-#include <stdlib.h>             /* malloc */
-#include <unistd.h>             /* close */
-#include <stdio.h>              /* printf, fflush -> DEBUG */
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
 #include "macro.h"
 
 #define NFDS 4
 #define NPKTS 3
 #define NCFGS 3
+#define NPKTIDS 4
+#define NCOUNTERS 2
+#define NLOSSCOUNTERS 2
 #define LASTDELAYS 10
 #define APP_PORT 6001
 #define PEER_PORT 7001
 #define MON_PORT 8000
 #define FIRST_PACKET_ID 9999
 #define MAX_RECVQ_LENGTH 2
-
 typedef enum types {
     mon, app, peer, path
 } types;
 typedef enum cfgn {
     old, new, tmp
 } cfgn;
-
+typedef enum pktids {
+    expected, sentpeer, sentapp, freed
+} pktids;
+typedef enum counters {
+    delivered, discarded
+} counters;
+typedef enum losscounters {
+    here, there                 /* FIXME: there not needed! */
+} losscounters;
 void print_routes(config_t * newcfg)
 {
     int i;
@@ -39,21 +49,28 @@ void print_routes(config_t * newcfg)
 int main(int argc, char *argv[])
 {
     int i, socks, maxfd, fd[NFDS], recvq_length;
-    uint32_t expected_pkt, last_sent_pkt, last_blah_pkt, last_freed_pkt,
-        delivered, discarded, counter, lastdelays[LASTDELAYS],
-        lastdelayindex, average_delay;
+    uint32_t pktid[NPKTIDS], count[NCOUNTERS];
+    char losscount[NLOSSCOUNTERS];
+    uint32_t lastdelays[LASTDELAYS], lastdelayindex, averagedelay;
     packet_t *pkt[NPKTS], *recvq;
     config_t cfg[NCFGS];
     fd_set infds, allsetinfds;
-    char ploss, peerloss;
 
-    expected_pkt = FIRST_PACKET_ID;
-    last_blah_pkt = last_freed_pkt = last_sent_pkt = FIRST_PACKET_ID - 1;
-    delivered = discarded = average_delay = 0;
-    ploss = peerloss = counter = lastdelayindex = 0;
-
+    averagedelay = 0;
+    lastdelayindex = 0;
     recvq = NULL;
     recvq_length = 0;
+
+    pktid[expected] = FIRST_PACKET_ID;
+
+    for (i = 1; i < NPKTIDS; i++)
+        pktid[i] = FIRST_PACKET_ID - 1;
+
+    for (i = 0; i < NCOUNTERS; i++)
+        count[i] = 0;
+
+    for (i = 0; i < NLOSSCOUNTERS; i++)
+        losscount[i] = 0;
 
     for (i = 0; i < NPKTS; i++)
         pkt[i] = NULL;
@@ -62,7 +79,6 @@ int main(int argc, char *argv[])
         cfg[i].type = 0;
         cfg[i].n = 0;
     }
-
 
     FD_ZERO(&allsetinfds);
 
@@ -82,34 +98,34 @@ int main(int argc, char *argv[])
         socks = select(maxfd + 1, &infds, NULL, NULL, NULL);
         if (socks <= 0)
             err(ERR_SELECT);
-        if (delivered + discarded > 0)
-            ploss =
-                ((double) discarded / (double) (delivered + discarded)) *
-                100;
-        warnx("%u ploss", ploss);
-        if (delivered >= LASTDELAYS) {
-            average_delay = 0;
+        if (count[delivered] + count[discarded] > 0)
+            losscount[here] =
+                ((double) count[discarded] /
+                 (double) (count[delivered] + count[discarded])) * 100;
+        if (count[delivered] >= LASTDELAYS) {
+            averagedelay = 0;
             for (i = 0; i < LASTDELAYS; i++)
-                average_delay += lastdelays[i];
-            average_delay /= LASTDELAYS;
+                averagedelay += lastdelays[i];
+            averagedelay /= LASTDELAYS;
         }
         if (recvq_length >= MAX_RECVQ_LENGTH) {
             while (recvq_length > 0) {
                 packet_t *a_pack = q_extract_first(&recvq);
                 recvq_length--;
-                if (a_pack->id >= expected_pkt) {
+                if (a_pack->id >= pktid[expected]) {
                     send_voice_pkts(fd[app], a_pack, SOCK_STREAM, NULL);
                     lastdelays[lastdelayindex] =
                         timeval_age(&a_pack->time);
                     if (lastdelays[lastdelayindex] < MAX_DELAY) {
                         lastdelayindex = (lastdelayindex + 1) % LASTDELAYS;
-                        delivered++;
-                        discarded += a_pack->id - last_blah_pkt - 1;
-                        last_blah_pkt = a_pack->id;
+                        count[delivered]++;
+                        count[discarded] +=
+                            a_pack->id - pktid[sentapp] - 1;
+                        pktid[sentapp] = a_pack->id;
                     }
-                    expected_pkt = a_pack->id + 1;
+                    pktid[expected] = a_pack->id + 1;
                 } else
-                    discarded++;
+                    count[discarded]++;
                 free(a_pack);
             }
         }
@@ -119,16 +135,16 @@ int main(int argc, char *argv[])
                 char answ = recv_mon(fd[mon], &cfg[tmp]);
                 switch (answ) {
                 case 'A':
-                    if (pkt[app]->id == last_sent_pkt
-                        && pkt[app]->id != last_freed_pkt) {
+                    if (pkt[app]->id == pktid[sentpeer]
+                        && pkt[app]->id != pktid[freed]) {
                         manage_ack(pkt[app]);
-                        last_freed_pkt = pkt[app]->id;
+                        pktid[freed] = pkt[app]->id;
                     }
                     break;
                 case 'N':
-                    if (pkt[app]->id == last_sent_pkt) {
+                    if (pkt[app]->id == pktid[sentpeer]) {
                         manage_nack(fd[peer], pkt[app], &cfg[new],
-                                    average_delay);
+                                    averagedelay);
                     }
                     break;
                 case 'C':
@@ -146,41 +162,40 @@ int main(int argc, char *argv[])
                 if (pkt[app] == NULL)
                     err(ERR_MALLOC);
                 recv_voice_pkts(fd[app], pkt[app], SOCK_STREAM, NULL);
-                pkt[app]->pa.ploss = ploss;
+                pkt[app]->pa.ploss = losscount[here];
                 send_voice_pkts(fd[peer], pkt[app], SOCK_DGRAM,
-                                select_path(&cfg[new], &to,
-                                            average_delay));
-                counter++;
-                last_sent_pkt = pkt[app]->id;
+                                select_path(&cfg[new], &to, averagedelay));
+                pktid[sentpeer] = pkt[app]->id;
                 FD_CLR(fd[app], &infds);
             } else if (FD_ISSET(fd[peer], &infds)) {
-                uint32_t pktid;
+                uint32_t recvpktid;
                 struct sockaddr_in from;
                 pkt[peer] = (packet_t *) malloc(sizeof(packet_t));
                 if (pkt[app] == NULL)
                     err(ERR_MALLOC);
-                pktid =
+                recvpktid =
                     recv_voice_pkts(fd[peer], pkt[peer], SOCK_DGRAM,
                                     &from);
-                peerloss = pkt[peer]->pa.ploss;
-                if (pktid == expected_pkt) {
+                losscount[there] = pkt[peer]->pa.ploss;
+                if (recvpktid == pktid[expected]) {
                     send_voice_pkts(fd[app], pkt[peer], SOCK_STREAM, NULL);
                     lastdelays[lastdelayindex] =
                         timeval_age(&pkt[peer]->time);
                     if (lastdelays[lastdelayindex] < MAX_DELAY) {
                         lastdelayindex = (lastdelayindex + 1) % LASTDELAYS;
-                        delivered++;
-                        discarded += pktid - last_blah_pkt - 1;
-                        last_blah_pkt = pktid;
+                        count[delivered]++;
+                        count[discarded] += recvpktid - pktid[sentapp] - 1;
+                        pktid[sentapp] = recvpktid;
                     }
                     free(pkt[peer]);
 
-                    expected_pkt++;
-                } else if (pktid > expected_pkt) {
+                    pktid[expected]++;
+                } else if (recvpktid > pktid[expected]) {
                     recvq_length += q_insert(&recvq, pkt[peer]);
                 }
 #ifdef DEBUG
-                warnx("pktid %u, expected_pkt %u", pktid, expected_pkt);
+                warnx("received pkt %u, expected %u", recvpktid,
+                      pktid[expected]);
 #endif
                 FD_CLR(fd[peer], &infds);
             } else
