@@ -109,7 +109,7 @@ ovvero il simulatore di rete wireless fornitoci
 
 \begin_layout Standard
 Il Monitor non scarta o ritarda i pacchetti in modo totalmente casuale,
- come si può notare dai grafici seguenti.
+ come si può notare dai grafici allegati.
 \end_layout
 
 \begin_layout Standard
@@ -180,10 +180,6 @@ if(casuale<=PERCENTUALE_ERRORE) { return(1); }
 \begin_layout Standard
 Sfruttare il cambiamento pseudo-casuale di queste due variabili nel tempo
  ha rappresentato uno dei maggiori ostacoli di questo progetto.
-\end_layout
-
-\begin_layout Section*
-Adattarsi al cambiamento
 \end_layout
 
 \begin_layout Standard
