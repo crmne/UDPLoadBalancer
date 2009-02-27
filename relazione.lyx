@@ -1,0 +1,364 @@
+#LyX 1.6.1 created this file. For more info see http://www.lyx.org/
+\lyxformat 345
+\begin_document
+\begin_header
+\textclass scrreprt
+\begin_preamble
+\usepackage{ae,aecompl}
+\end_preamble
+\use_default_options true
+\language italian
+\inputencoding auto
+\font_roman default
+\font_sans default
+\font_typewriter default
+\font_default_family default
+\font_sc false
+\font_osf false
+\font_sf_scale 100
+\font_tt_scale 100
+
+\graphics default
+\paperfontsize default
+\spacing single
+\use_hyperref false
+\papersize a4paper
+\use_geometry false
+\use_amsmath 1
+\use_esint 1
+\cite_engine basic
+\use_bibtopic false
+\paperorientation portrait
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\defskip medskip
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\author "" 
+\author "" 
+\end_header
+
+\begin_body
+
+\begin_layout Title
+Relazione del Progetto di Reti 2007/2008
+\end_layout
+
+\begin_layout Author
+Carmine Paolino <cpaolino@cs.unibo.it>
+\end_layout
+
+\begin_layout Date
+27 febbraio 2009
+\end_layout
+
+\begin_layout Chapter*
+Principi di progettazione
+\end_layout
+
+\begin_layout Section*
+Non affidabilità del canale
+\end_layout
+
+\begin_layout Standard
+Il problema presentato dall'esercizio è garantire una bassa percentuale
+ di perdita dei pacchetti VoIP.
+ L'ambiente wireless simulato scarta circa il 15% dei pacchetti
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+con le opzioni di default del simulatore
+\end_layout
+
+\end_inset
+
+ in modo quasi casuale.
+\end_layout
+
+\begin_layout Standard
+Non solo: i pacchetti possono essere ritardati, talvolta più del tempo massimo
+ che garantisce un buon livello di interattività in una conversazione VoIP.
+ ITU-T G.114 raccomanda un massimo di 150ms di latenza per pacchetto, che
+ è anche il limite massimo scelto per l'esercizio.
+\end_layout
+
+\begin_layout Standard
+La somma di questi due comportamenti porta il numero di pacchetti persi
+ a circa il 22%.
+\end_layout
+
+\begin_layout Section*
+La verità sul Monitor
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+ovvero il simulatore di rete wireless fornitoci
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Il Monitor non scarta o ritarda i pacchetti in modo totalmente casuale,
+ come si può notare dai grafici seguenti.
+\end_layout
+
+\begin_layout Standard
+Affermazione rinforzata dall'analisi del codice del Monitor, della quale
+ riporto i punti salienti:
+\end_layout
+
+\begin_layout Itemize
+il calcolo del delay
+\end_layout
+
+\begin_layout Quotation
+
+\family typewriter
+delay.tv_sec=0;
+\end_layout
+
+\begin_layout Quotation
+
+\family typewriter
+delay.tv_usec=30000
+\end_layout
+
+\begin_deeper
+\begin_layout Quotation
+
+\family typewriter
++ (random()%20000)
+\end_layout
+
+\begin_layout Quotation
+
+\family typewriter
++ abs(50000*sin((now.tv_sec-coppiafd[i].sec_istcreazione)/8.0));
+\end_layout
+
+\end_deeper
+\begin_layout Itemize
+l'algoritmo che sceglie quali pacchetti scartare
+\end_layout
+
+\begin_layout Quotation
+
+\family typewriter
+gettimeofday(&now,NULL);
+\end_layout
+
+\begin_layout Quotation
+
+\family typewriter
+casuale=random()%100-3*abs(
+\end_layout
+
+\begin_deeper
+\begin_layout Quotation
+
+\family typewriter
+sin((now.tv_sec-coppiafd[i].sec_istcreazione)/8.0));
+\end_layout
+
+\end_deeper
+\begin_layout Quotation
+
+\family typewriter
+if(casuale<=PERCENTUALE_ERRORE) { return(1); }
+\end_layout
+
+\begin_layout Standard
+Sfruttare il cambiamento pseudo-casuale di queste due variabili nel tempo
+ ha rappresentato uno dei maggiori ostacoli di questo progetto.
+\end_layout
+
+\begin_layout Section*
+Adattarsi al cambiamento
+\end_layout
+
+\begin_layout Standard
+L'unica soluzione dunque, scartata quella basata su NACK, sembra quella
+ basata su un algoritmo adattivo.
+\end_layout
+
+\begin_layout Chapter*
+Il protocollo
+\end_layout
+
+\begin_layout Section*
+Panoramica
+\end_layout
+
+\begin_layout Standard
+La soluzione da me proposta consta di
+\end_layout
+
+\begin_layout Itemize
+un algoritmo per selezionare il percorso migliore in base alla media dei
+ ritardi degli ultimi n pacchetti
+\end_layout
+
+\begin_layout Itemize
+un algoritmo per calcolare la percentuale di pacchetti persi, o in ritardo
+ superiore a quello consentito, nel percorso dal fixed load balancer al
+ mobile load balancer
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+da ora in poi abbreviati in Mobile e Fixed
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+un protocollo per spedire questa informazione al Fixed
+\end_layout
+
+\begin_layout Itemize
+un algoritmo adattivo che rispedisce i pacchetti in base alla percentuale
+ di pacchetti persi al Mobile
+\end_layout
+
+\begin_layout Section*
+Come funziona
+\end_layout
+
+\begin_layout Standard
+A partire dal primo pacchetto ricevuto dal Fixed e per ogni pacchetto successivo
+, il Mobile calcola la percentuale di pacchetti persi nel percorso da Fixed
+ a Mobile, spedendola al Fixed in un byte in coda ai prossimi pacchetti.
+ Questo causa un incremento del bandwidth, data la dimensione di un pacchetto
+ pari a 100 byte
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+come di default nel progetto
+\end_layout
+
+\end_inset
+
+ e a partire dal primo pacchetto ricevuto dal Mobile, dello 0.5%
+\end_layout
+
+\begin_layout Standard
+Il Fixed riceve questa informazione e in base ad essa ricalcola la frequenza
+ di rispedizione dei pacchetti secondo questi criteri:
+\end_layout
+
+\begin_layout Itemize
+ricalcola la frequenza costante di rispedizione in base alla percentuale
+ di pacchetti persi e ad una costante 
+\begin_inset Formula $c$
+\end_inset
+
+ basata sull'analisi dei risultati dei test
+\end_layout
+
+\begin_layout Itemize
+se la percentuale supera un certo limite 
+\begin_inset Formula $p$
+\end_inset
+
+, sposta in avanti o indietro di 1 il periodo della frequenza di rispedizione
+ dei pacchetti, in modo tale da indovinare quella utilizzata dal Monitor
+ per scartare i pacchetti
+\end_layout
+
+\begin_layout Standard
+Inoltre il Mobile salva il delay di ogni pacchetto ricevuto in un array
+ di 
+\begin_inset Formula $n$
+\end_inset
+
+ elementi.
+ Per ogni pacchetto ricevuto in tempo con 
+\begin_inset Formula $id>n$
+\end_inset
+
+ il Mobile calcola la media dei delay degli ultimi 
+\begin_inset Formula $n$
+\end_inset
+
+ pacchetti.
+ Da questo momento il percorso verrà cambiato ogni volta che la media dei
+ delay supera un numero 
+\begin_inset Formula $m$
+\end_inset
+
+, basato sull'analisi dei risultati dei test.
+\end_layout
+
+\begin_layout Standard
+Tutti e due i load balancers, infine, utilizzano una coda per salvare i
+ pacchetti ricevuti fuori ordine, con lunghezza massima 
+\begin_inset Formula $l$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Chapter*
+Test
+\end_layout
+
+\begin_layout Standard
+Dai vari test effettuati si è riscontrato che i migliori risultati si hanno
+ con
+\end_layout
+
+\begin_layout Itemize
+lunghezza della coda dei pacchetti fuori ordine 
+\begin_inset Formula $l=2$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+limite di perdita dei pacchetti prima di cambiare il periodo di rispedizione
+ di pacchetti 
+\begin_inset Formula $p=17$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+costante inversamente proporzionale alla frequenza di rispedizione dei pacchetti
+ 
+\begin_inset Formula $c=25$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+il delay massimo accettabile prima di cambiare percorso 
+\begin_inset Formula $m=delaymassimo*8/15$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Con gli algoritmi sopra presentati e l'uso di questi valori si riesce ad
+ ottenere quasi sempre un packet loss di circa il 12%.
+\end_layout
+
+\end_body
+\end_document
