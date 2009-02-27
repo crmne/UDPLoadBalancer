@@ -10,21 +10,26 @@
 #define PATH_PORT 9001
 #define FIRST_PACKET_ID 0
 #define MAX_RECVQ_LENGTH 2
+#define RATE_PERIOD 25
+#define UPPER_LIMIT_PKTLOSS 17
 
 typedef enum types {
     app, peer, path
 } types;
+
 int main(int argc, char *argv[])
 {
-    int i, socks, maxfd, fd[NFDS], recvq_length;
-    uint32_t expected_pkt;
+    int i, socks, maxfd, fd[NFDS], recvq_length, resend;
+    uint32_t expected_pkt, pktcounter;
     struct sockaddr_in from;
     packet_t *pkt[NPKTS], *recvq;
     fd_set infds, allsetinfds;
     char peerloss;
 
+    resend = rand() % 2;
     expected_pkt = FIRST_PACKET_ID;
     peerloss = 0;
+    pktcounter = 0;
 
     recvq = NULL;
     recvq_length = 0;
@@ -81,17 +86,23 @@ int main(int argc, char *argv[])
             } else if (FD_ISSET(fd[app], &infds)) {
                 unsigned int resend_rate;
                 if (peerloss > 0) {
-                    resend_rate = (25 / peerloss) + 1;
+                    if (peerloss >= UPPER_LIMIT_PKTLOSS)
+                        resend = (resend + 1) % 2;
+                    resend_rate = (RATE_PERIOD / peerloss) + 1;
+#ifdef DEBUG
                     warnx("resend rate = %u", resend_rate);
-                    if (rand() % resend_rate == 1)
+#endif
+                    if (pktcounter % resend_rate == resend)
                         send_voice_pkts(fd[peer], pkt[app], SOCK_DGRAM,
                                         &from);
+                    pktcounter++;
                 }
                 free(pkt[app]);
                 pkt[app] = (packet_t *) malloc(sizeof(packet_t));
                 recv_voice_pkts(fd[app], pkt[app], SOCK_STREAM, NULL);
                 pkt[app]->ploss = 0;
                 send_voice_pkts(fd[peer], pkt[app], SOCK_DGRAM, &from);
+                pktcounter++;
                 FD_CLR(fd[app], &infds);
             } else
                 errx(ERR_NOFDSET);

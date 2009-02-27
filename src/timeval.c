@@ -1,6 +1,6 @@
 #include <err.h>
 #include "macro.h"
-uint32_t timeval_diff(const struct timeval *a, const struct timeval *b)
+uint32_t timeval_diff(const struct timeval * a, const struct timeval * b)
 {
     uint32_t r;
 

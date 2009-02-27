@@ -17,6 +17,8 @@
 #define MON_PORT 8000
 #define FIRST_PACKET_ID 9999
 #define MAX_RECVQ_LENGTH 2
+#define MAX_ACCEPTABLE_DELAY MAX_DELAY * 8 / 15
+
 typedef enum types {
     mon, app, peer
 } types;
@@ -29,7 +31,9 @@ typedef enum pktids {
 typedef enum counters {
     delivered, discarded
 } counters;
+
 unsigned int path = 0;
+
 struct sockaddr_in *select_path(config_t * config, struct sockaddr_in *to,
                                 uint32_t average_delay)
 {
@@ -38,7 +42,7 @@ struct sockaddr_in *select_path(config_t * config, struct sockaddr_in *to,
     if (to->sin_addr.s_addr < 0)
         err(ERR_INETADDR);
     if (config->n != 0) {
-        if (average_delay > (MAX_DELAY * 8 / 15))
+        if (average_delay > (MAX_ACCEPTABLE_DELAY))
             path = (path + 1) % config->n;
         to->sin_port = htons(config->port[path]);
 

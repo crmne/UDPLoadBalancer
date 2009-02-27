@@ -58,15 +58,3 @@ packet_t *q_extract_first(packet_t ** pktQueue)
     }
     return first;
 }
-
-void q_print(packet_t * queue)
-{
-    packet_t *current = queue;
-
-    fprintf(stderr, "Queue: ");
-    while (current != NULL) {
-        fprintf(stderr, "%d ", current->id);
-        current = (packet_t *) current->next;
-    }
-    fprintf(stderr, "NULL\n");
-}

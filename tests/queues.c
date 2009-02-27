@@ -1,6 +1,17 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "macro.h"
+void q_print(packet_t * queue)
+{
+    packet_t *current = queue;
+
+    fprintf(stderr, "Queue: ");
+    while (current != NULL) {
+        fprintf(stderr, "%d ", current->id);
+        current = (packet_t *) current->next;
+    }
+    fprintf(stderr, "NULL\n");
+}
 int main(int argc, char *argv[])
 {
     int i;
