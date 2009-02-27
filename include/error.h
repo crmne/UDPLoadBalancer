@@ -6,7 +6,7 @@
 #define ERR_RECV 7, "failed reading %d bytes from socket %d", n, socketfd
 #define ERR_SEND 8, "failed writing %d bytes from socket %d", size, socketfd
 #define ERR_GETTIMEOFDAY 10, "gettimeofday()"
-#define ERR_INETATON 11, "inet_aton() error (addr %s, port %d)", addr, port
+#define ERR_INETADDR 11, "inet_addr()"
 #define ERR_SOCKET 12, "socket() error (type %d)", type
 #define ERR_SETSOCKOPT 13, "setsockopt() error (type %d, socketfd %d)", type, socketfd
 #define ERR_BIND 14, "bind() error (port %d, socketfd %d)", port, socketfd
@@ -16,4 +16,4 @@
 #define ERR_MALLOC 18, "malloc()"
 
 /* WARNINGS */
-#define WARN_2PKTQ "Oh my god two packets with the same id %u in Queue!", packet->id
+#define WARN_2PKTQ "Ignoring insertion of already in queue packet (id %u)", packet->id

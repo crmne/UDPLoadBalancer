@@ -7,12 +7,13 @@ char q_insert(packet_t ** pktQueue, packet_t * packet)
     char inserted = 1;
     packet_t *current, *prev;
 
-    packet->next = NULL;
-    if (*pktQueue == NULL) {
+    current = *pktQueue;
+    prev = NULL;
+
+    if (current == NULL) {
+        packet->next = NULL;
         *pktQueue = packet;
     } else {
-        current = *pktQueue;
-        prev = NULL;
         while (current != NULL) {
             if (packet->id > current->id) {
                 if (current->next != NULL) {
@@ -31,11 +32,11 @@ char q_insert(packet_t ** pktQueue, packet_t * packet)
                 packet->next = (struct packet_t *) current;
                 current = NULL;
             } else {
-                inserted = 0;
 #ifdef DEBUG
                 warnx(WARN_2PKTQ);
 #endif
                 current = NULL;
+                inserted = 0;
             }
         }
     }
@@ -58,47 +59,14 @@ packet_t *q_extract_first(packet_t ** pktQueue)
     return first;
 }
 
-packet_t *q_remove(packet_t ** pktQueue, uint32_t id)
-{
-    packet_t *current = NULL, *prev;
-
-    if (*pktQueue != NULL) {
-        current = *pktQueue;
-        prev = NULL;
-        if (id == current->id)
-            return q_extract_first(pktQueue);
-        while (current != NULL && id != current->id) {
-            prev = current;
-            current = (packet_t *) current->next;
-        }
-        if (current != NULL) {
-            prev->next = current->next;
-        }
-    }
-    return current;
-}
-
-uint32_t removeLessQ(packet_t ** pktQueue, uint32_t id)
-{
-    int removed = 0;
-
-    while (*pktQueue != NULL && id >= (*pktQueue)->id) {
-        q_extract_first(pktQueue);
-        removed++;
-    }
-    return removed;
-}
-
 void q_print(packet_t * queue)
 {
     packet_t *current = queue;
 
-    if (current != NULL) {
-        fprintf(stderr, "Queue: ");
-        while (current != NULL) {
-            fprintf(stderr, "%d ", current->id);
-            current = (packet_t *) current->next;
-        }
-        fprintf(stderr, "NULL\n");
+    fprintf(stderr, "Queue: ");
+    while (current != NULL) {
+        fprintf(stderr, "%d ", current->id);
+        current = (packet_t *) current->next;
     }
+    fprintf(stderr, "NULL\n");
 }

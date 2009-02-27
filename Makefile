@@ -1,7 +1,7 @@
 INCLUDES=-Iinclude
 LDFLAGS=-lpthread -lm
 DEFINES=-DDEBUG
-CFLAGS=${INCLUDES} -O3 -pipe -Wall -ansi -pedantic -ggdb ${DEFINES}
+CFLAGS=${INCLUDES} -O3 -pipe -Wall -Werror -ansi -pedantic -ggdb ${DEFINES}
 SUBDIRS=disttest tests
 CORE=src/conn.o src/comm.o src/queue.o src/timeval.o
 SOURCES=src/*.c include/*.h
@@ -41,4 +41,4 @@ cleansubdirs:
 	-for i in $(SUBDIRS); do $(MAKE) -C "$${i}" clean; done
 
 clean:	cleansubdirs cleanindent cleanplot
-	-rm -f $(EXECUTABLES) $(CORE) *.txt 2> /dev/null
+	-rm -f $(EXECUTABLES) src/*.o *.txt 2> /dev/null

@@ -1,6 +1,6 @@
-#include <string.h>             /* memset */
+#include <stdlib.h>
+#include <string.h>
 #include <err.h>
-#include <stdlib.h>             /* malloc */
 #include "macro.h"
 
 #define NFDS 3
@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
                 if (peerloss > 0) {
                     resend_rate = (25 / peerloss) + 1;
                     warnx("resend rate = %u", resend_rate);
-                    if (random() % resend_rate == 1)
+                    if (rand() % resend_rate == 1)
                         send_voice_pkts(fd[peer], pkt[app], SOCK_DGRAM,
                                         &from);
                 }

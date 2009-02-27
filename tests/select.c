@@ -11,17 +11,17 @@ int main(int argc, char *argv[])
     char monAnswer;
     uint32_t appAnswer;
     int monitorSock, listenSock, appSock;
-    config_t oldcfg, newcfg, tempcfg;
+    config_t tempcfg;
     packet_t prova;
     fd_set infds, allsetinfds;
 
-
+    appSock = 0;
     FD_ZERO(&allsetinfds);
 
-    monitorSock = connectToMon(HOST, MONPORT);
+    monitorSock = connect_mon(HOST, MONPORT);
     FD_SET(monitorSock, &allsetinfds);
 
-    listenSock = listenFromApp(HOST, APPPORT);
+    listenSock = listen_app(HOST, APPPORT);
     FD_SET(listenSock, &allsetinfds);
 
     fd = listenSock;
@@ -31,13 +31,13 @@ int main(int argc, char *argv[])
         retsel = select(fd + 1, &infds, NULL, NULL, NULL);
         if (retsel > 0) {
             if (FD_ISSET(monitorSock, &infds)) {
-                monAnswer = recvMonitorPkts(monitorSock, &tempcfg);
+                monAnswer = recv_mon(monitorSock, &tempcfg);
             }
             if (FD_ISSET(appSock, &infds)) {
-                appAnswer = recvVoicePkts(appSock, &prova);
+                appAnswer = recv_voice_pkts(appSock, &prova, SOCK_STREAM, NULL);
             }
             if (FD_ISSET(listenSock, &infds)) {
-                appSock = acceptFromApp(listenSock);
+                appSock = accept_app(listenSock);
                 FD_SET(appSock, &allsetinfds);
                 fd = appSock;
             }

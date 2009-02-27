@@ -16,52 +16,30 @@ int main(int argc, char *argv[])
     seven.id = 7;
     eight.id = 8;
 
-    printQueue(Queue);
+    q_print(Queue);
 
     fprintf(stderr, "Testing insertions...\n");
-    insertInQ(&Queue, &four);
-    printQueue(Queue);
-    insertInQ(&Queue, &two);
-    printQueue(Queue);
-    insertInQ(&Queue, &three);
-    printQueue(Queue);
-    insertInQ(&Queue, &eight);
-    printQueue(Queue);
-    insertInQ(&Queue, &one);
-    printQueue(Queue);
-    insertInQ(&Queue, &seven);
-    printQueue(Queue);
+    q_insert(&Queue, &four);
+    q_print(Queue);
+    q_insert(&Queue, &two);
+    q_print(Queue);
+    q_insert(&Queue, &three);
+    q_print(Queue);
+    q_insert(&Queue, &eight);
+    q_print(Queue);
+    q_insert(&Queue, &one);
+    q_print(Queue);
+    q_insert(&Queue, &one);
+    q_print(Queue);
+
+    q_insert(&Queue, &seven);
+    q_print(Queue);
 
     fprintf(stderr, "Testing removes of first element...\n");
     for (i = 0; i < 10; i++) {
-        getFirstInQ(&Queue);
-        printQueue(Queue);
+        q_extract_first(&Queue);
+        q_print(Queue);
     }
-
-    fprintf(stderr, "Repopulating queue...\n");
-    insertInQ(&Queue, &four);
-    insertInQ(&Queue, &two);
-    insertInQ(&Queue, &three);
-    insertInQ(&Queue, &eight);
-    insertInQ(&Queue, &one);
-    insertInQ(&Queue, &seven);
-    printQueue(Queue);
-
-    fprintf(stderr, "Testing general removes...\n");
-    removeFromQ(&Queue, four.id);
-    printQueue(Queue);
-    removeFromQ(&Queue, two.id);
-    printQueue(Queue);
-    removeFromQ(&Queue, three.id);
-    printQueue(Queue);
-    removeFromQ(&Queue, five.id);
-    printQueue(Queue);
-    removeFromQ(&Queue, eight.id);
-    printQueue(Queue);
-    removeFromQ(&Queue, one.id);
-    printQueue(Queue);
-    removeFromQ(&Queue, seven.id);
-    printQueue(Queue);
 
     return 0;
 }

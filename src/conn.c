@@ -12,8 +12,9 @@ struct sockaddr_in set_sock(const char *addr, int port)
 
     memset(&sock, 0, sizeof(sock));
     sock.sin_family = AF_INET;
-    if (inet_aton(addr, &sock.sin_addr) == 0)
-        err(ERR_INETATON);
+    sock.sin_addr.s_addr = inet_addr(addr);
+    if (sock.sin_addr.s_addr < 0)
+        err(ERR_INETADDR);
     sock.sin_port = htons(port);
     return sock;
 }

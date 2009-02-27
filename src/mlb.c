@@ -35,6 +35,8 @@ struct sockaddr_in *select_path(config_t * config, struct sockaddr_in *to,
 {
     to->sin_family = AF_INET;
     to->sin_addr.s_addr = inet_addr(HOST);
+    if (to->sin_addr.s_addr < 0)
+        err(ERR_INETADDR);
     if (config->n != 0) {
         if (average_delay > (MAX_DELAY * 8 / 15))
             path = (path + 1) % config->n;
